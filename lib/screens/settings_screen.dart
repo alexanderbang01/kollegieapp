@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:kollegieapp/widgets/theme_switch.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
-import '../widgets/theme_switch.dart';
 import '../widgets/navigation_menu.dart';
 import '../utils/constants.dart';
 import '../utils/theme.dart';
@@ -28,14 +28,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Indstillinger',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
-        backgroundColor:
-            theme.brightness == Brightness.light
-                ? Colors.white
-                : const Color(0xFF1C1C1E),
-        foregroundColor:
-            theme.brightness == Brightness.light
-                ? AppTheme.primaryColor
-                : Colors.white,
+        backgroundColor: theme.brightness == Brightness.light
+            ? Colors.white
+            : const Color(0xFF1C1C1E),
+        foregroundColor: theme.brightness == Brightness.light
+            ? AppTheme.primaryColor
+            : Colors.white,
         elevation: 0,
         // Flytter tilbage-knappen til venstre, men bruger iOS-stil
         leading: IconButton(
@@ -51,152 +49,169 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       // Bruger den genbrugelige NavigationMenu-widget
-      endDrawer: const NavigationMenu(),
+      endDrawer: const NavigationMenu(currentRoute: settingsRoute),
       body: SafeArea(
         child: Padding(
           padding: AppSpacing.screenPadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Appindstillinger',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.medium),
-
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    ThemeSwitchWidget(
-                      isDarkMode: themeService.isDarkMode,
-                      onChanged: (value) {
-                        themeService.setTheme(value);
-                      },
-                    ),
-                    SwitchListTile(
-                      title: Row(
-                        children: [
-                          Icon(
-                            AppIcons.notifications,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 16),
-                          const Text(
-                            AppText.notificationsSwitch,
-                            style: TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                      value:
-                          true, // Dette ville normalt være en gemt indstilling
-                      onChanged: (value) {
-                        // Implementer notifikationslogik her
-                      },
-                      activeColor: theme.colorScheme.primary,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: AppSpacing.large),
-
-              Text(
-                'Kontoinformation',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.medium),
-
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: AppSpacing.cardPadding,
-                  child: Column(
-                    children: [
-                      _buildInfoRow(context, 'Navn', 'Alexander Jensen'),
-                      const Divider(),
-                      _buildInfoRow(context, 'Email', 'alexander@example.com'),
-                      const Divider(),
-                      _buildInfoRow(context, 'Værelse', 'A-204'),
-                    ],
+          child: SingleChildScrollView(
+            // Sikrer at indholdet kan scrolles hvis det ikke passer
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Appindstillinger',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
+                const SizedBox(height: AppSpacing.medium),
 
-              const SizedBox(height: AppSpacing.large),
-
-              Text(
-                'App information',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.medium),
-
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: AppSpacing.cardPadding,
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Column(
                     children: [
-                      _buildInfoRow(context, 'App version', appVersion),
-                      const Divider(),
-                      _buildInfoRow(
-                        context,
-                        'Udviklet af',
-                        'Mercantec Studerende',
+                      ThemeSwitchWidget(
+                        isDarkMode: themeService.isDarkMode,
+                        onChanged: (value) {
+                          themeService.setTheme(value);
+                        },
                       ),
-                      const Divider(),
-                      _buildInfoRow(context, 'Kontakt', 'support@mercantec.dk'),
-                    ],
-                  ),
-                ),
-              ),
-
-              const Spacer(),
-
-              Center(
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Implementer log ud logik her
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Log ud funktion vil blive implementeret senere',
+                      SwitchListTile(
+                        title: Row(
+                          children: [
+                            Icon(
+                              AppIcons.notifications,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 16),
+                            const Text(
+                              AppText.notificationsSwitch,
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                          ],
                         ),
+                        value:
+                            true, // Dette ville normalt være en gemt indstilling
+                        onChanged: (value) {
+                          // Implementer notifikationslogik her
+                        },
+                        activeColor: theme.colorScheme.primary,
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    minimumSize: const Size(
-                      double.infinity,
-                      50,
-                    ), // Gør knappen bredere
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Log ud',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    ],
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: AppSpacing.large),
+
+                Text(
+                  'Kontoinformation',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.medium),
+
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: AppSpacing.cardPadding,
+                    child: Column(
+                      children: [
+                        _buildInfoRow(context, 'Navn', 'Alexander Jensen'),
+                        const Divider(),
+                        _buildInfoRow(
+                          context,
+                          'Email',
+                          'alexander@example.com',
+                        ),
+                        const Divider(),
+                        _buildInfoRow(context, 'Telefon', '+45 12 34 56 78'),
+                        const Divider(),
+                        _buildInfoRow(context, 'Værelse', 'A-204'),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.large),
+
+                Text(
+                  'App information',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.medium),
+
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: AppSpacing.cardPadding,
+                    child: Column(
+                      children: [
+                        _buildInfoRow(context, 'App version', appVersion),
+                        const Divider(),
+                        _buildInfoRow(
+                          context,
+                          'Udviklet af',
+                          'Mercantec Studerende',
+                        ),
+                        const Divider(),
+                        _buildInfoRow(
+                          context,
+                          'Kontakt',
+                          'support@mercantec.dk',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // Implementer log ud logik her
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Log ud funktion vil blive implementeret senere',
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      minimumSize: const Size(
+                        double.infinity,
+                        50,
+                      ), // Gør knappen bredere
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Log ud',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -215,11 +230,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               context,
             ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
           ),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+          Flexible(
+            // Flexible sikrer at værdien ikke overskrider skærmens bredde
+            child: Text(
+              value,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+              overflow:
+                  TextOverflow.ellipsis, // Viser "..." hvis teksten er for lang
+            ),
           ),
         ],
       ),

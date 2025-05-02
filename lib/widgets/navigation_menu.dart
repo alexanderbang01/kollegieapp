@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../utils/constants.dart';
 
 class NavigationMenu extends StatelessWidget {
-  const NavigationMenu({Key? key}) : super(key: key);
+  final String currentRoute;
+
+  const NavigationMenu({Key? key, required this.currentRoute})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -12,17 +15,36 @@ class NavigationMenu extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            height: 170,
-            decoration: BoxDecoration(color: theme.colorScheme.primary),
+            height: 200, // Øget højde
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary,
+              borderRadius: const BorderRadius.only(
+                bottomRight: Radius.circular(24),
+                bottomLeft: Radius.circular(24),
+              ),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Row(
                     children: [
-                      Image.asset('assets/logo.png', width: 60, height: 60),
+                      // Rundt logo
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(40),
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.white,
+                          padding: const EdgeInsets.all(8),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
                       const SizedBox(width: 16),
                       const Expanded(
                         child: Column(
@@ -32,16 +54,32 @@ class NavigationMenu extends StatelessWidget {
                               'Kollegie App',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 18,
                               ),
                             ),
                             SizedBox(height: 4),
                             Text(
-                              'Tlf: +45 12 34 56 78',
+                              'Alexander Jensen',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'alexander@example.com',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Tlf: +45 12 34 56 78',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
                               ),
                             ),
                           ],
@@ -53,65 +91,87 @@ class NavigationMenu extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 12),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
               children: [
-                ListTile(
-                  leading: Icon(
-                    AppIcons.home,
-                    color: theme.colorScheme.primary,
+                // Hovednavigation
+                const Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
                   ),
-                  title: const Text(
-                    AppText.homeTitle,
-                    style: TextStyle(fontWeight: FontWeight.w500),
+                  child: Text(
+                    'NAVIGATION',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                    ),
                   ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.pushReplacementNamed(context, homeRoute);
-                  },
                 ),
-                ListTile(
-                  leading: Icon(
-                    AppIcons.food,
-                    color: theme.colorScheme.primary,
-                  ),
-                  title: const Text(
-                    AppText.foodTitle,
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.pushNamed(context, foodRoute);
-                  },
+                _buildNavItem(
+                  context: context,
+                  icon: AppIcons.home,
+                  title: AppText.homeTitle,
+                  route: homeRoute,
+                  isActive: currentRoute == homeRoute,
                 ),
-                ListTile(
-                  leading: Icon(
-                    AppIcons.events,
-                    color: theme.colorScheme.primary,
-                  ),
-                  title: const Text(
-                    AppText.eventsTitle,
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.pushNamed(context, eventsRoute);
-                  },
+                _buildNavItem(
+                  context: context,
+                  icon: AppIcons.food,
+                  title: AppText.foodTitle,
+                  route: foodRoute,
+                  isActive: currentRoute == foodRoute,
                 ),
-                ListTile(
-                  leading: Icon(
-                    AppIcons.settings,
-                    color: theme.colorScheme.primary,
+                _buildNavItem(
+                  context: context,
+                  icon: AppIcons.events,
+                  title: AppText.eventsTitle,
+                  route: eventsRoute,
+                  isActive: currentRoute == eventsRoute,
+                ),
+
+                // Divider for at separere navigation og personlige indstillinger
+                const Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
                   ),
-                  title: const Text(
-                    AppText.settingsTitle,
-                    style: TextStyle(fontWeight: FontWeight.w500),
+                  child: Divider(),
+                ),
+
+                // Personlige indstillinger sektion
+                const Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
                   ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.pushNamed(context, settingsRoute);
-                  },
+                  child: Text(
+                    'PERSONLIGT',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                _buildNavItem(
+                  context: context,
+                  icon: AppIcons.profile,
+                  title: AppText.profileTitle,
+                  route: profileRoute,
+                  isActive: currentRoute == profileRoute,
+                ),
+                _buildNavItem(
+                  context: context,
+                  icon: AppIcons.settings,
+                  title: AppText.settingsTitle,
+                  route: settingsRoute,
+                  isActive: currentRoute == settingsRoute,
                 ),
               ],
             ),
@@ -125,6 +185,78 @@ class NavigationMenu extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String route,
+    required bool isActive,
+  }) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: Material(
+        color: isActive
+            ? theme.colorScheme.primary.withOpacity(0.1)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.pop(context);
+            if (!isActive) {
+              if (route == homeRoute) {
+                Navigator.pushReplacementNamed(context, route);
+              } else {
+                Navigator.pushNamed(context, route);
+              }
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 12.0,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: isActive
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface.withOpacity(0.8),
+                  size: 28, // Større ikon
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                    fontSize: 16, // Større tekst
+                    color: isActive
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withOpacity(0.8),
+                  ),
+                ),
+                if (isActive) ...[
+                  const Spacer(),
+                  Container(
+                    width: 8,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -23,7 +23,9 @@ class _HomeScreenState extends State<HomeScreen> {
           'Forside',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
-        backgroundColor: theme.colorScheme.primary,
+        backgroundColor: theme.brightness == Brightness.light
+            ? theme.colorScheme.primary
+            : const Color(0xFF1C1C1E),
         foregroundColor: Colors.white,
         elevation: 0,
         // Flytter navigationsikonet til højre side
@@ -35,8 +37,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      // Bruger den genbrugelige NavigationMenu-widget
-      endDrawer: const NavigationMenu(),
+      // Bruger den genbrugelige og forbedrede NavigationMenu-widget
+      endDrawer: const NavigationMenu(currentRoute: homeRoute),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
