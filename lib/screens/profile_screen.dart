@@ -75,7 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _buildDetailRow(context, 'Telefon', '+45 12 34 56 78'),
                         _buildDetailRow(
                           context,
-                          'Fodselsdato',
+                          'Fødselsdato',
                           '15. juni 1998',
                         ),
                       ],
@@ -92,7 +92,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Adresse',
                       icon: Icons.home,
                       content: [
-                        _buildDetailRow(context, 'Vaerelse', 'A-204'),
+                        _buildDetailRow(context, 'Værelse', 'A-204'),
                         _buildDetailRow(context, 'Etage', '2. sal'),
                         _buildDetailRow(context, 'Adresse', 'Kollegievej 123'),
                         _buildDetailRow(context, 'Postnr & By', '8800 Viborg'),
@@ -104,10 +104,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 20),
 
-                    // Kontaktperson
+                    // Kontaktperson - Ændret overskrift til kun 'Kontaktperson'
                     _buildInfoCard(
                       context,
-                      title: 'Kontaktperson i nodsituation',
+                      title: 'Kontaktperson',
                       icon: Icons.contacts,
                       content: [
                         _buildDetailRow(context, 'Navn', 'Marie Jensen'),
@@ -118,33 +118,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _showEditDialog(context, 'Kontaktperson');
                       },
                     ),
-
-                    const SizedBox(height: 20),
-
-                    // Præferencer
-                    _buildInfoCard(
-                      context,
-                      title: 'Praeferencers',
-                      icon: Icons.favorite,
-                      content: [
-                        _buildSwitchRow(
-                          context,
-                          'Vis mig i beboerlisten',
-                          true,
-                        ),
-                        _buildSwitchRow(
-                          context,
-                          'Modtag push-notifikationer',
-                          true,
-                        ),
-                        _buildSwitchRow(context, 'Email-notifikationer', false),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Betalingshistorik
-                    _buildPaymentHistoryCard(context),
 
                     const SizedBox(height: 30),
                   ],
@@ -232,6 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
                   icon,
@@ -239,14 +213,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   size: 24,
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18, // Tilbage til original størrelse
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 if (onEdit != null)
                   IconButton(
                     icon: const Icon(Icons.edit),
@@ -278,158 +253,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               value,
               style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
               overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSwitchRow(BuildContext context, String label, bool value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-          ),
-          Switch(
-            value: value,
-            onChanged: (newValue) {
-              // Håndter ændring af switch
-            },
-            activeColor: Theme.of(context).colorScheme.primary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentHistoryCard(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.receipt_long,
-                  color: theme.colorScheme.primary,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Betalingshistorik',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            const Divider(height: 24),
-
-            // Transaktioner
-            _buildTransactionItem(
-              context,
-              date: '01. maj 2025',
-              description: 'Husleje - Maj',
-              amount: '4.200 kr',
-              isCompleted: true,
-            ),
-            const Divider(height: 8),
-            _buildTransactionItem(
-              context,
-              date: '01. apr 2025',
-              description: 'Husleje - April',
-              amount: '4.200 kr',
-              isCompleted: true,
-            ),
-            const Divider(height: 8),
-            _buildTransactionItem(
-              context,
-              date: '01. mar 2025',
-              description: 'Husleje - Marts',
-              amount: '4.200 kr',
-              isCompleted: true,
-            ),
-
-            const SizedBox(height: 16),
-            Center(
-              child: TextButton(
-                onPressed: () {
-                  // Se alle transaktioner
-                },
-                child: Text(
-                  'Se alle transaktioner',
-                  style: TextStyle(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTransactionItem(
-    BuildContext context, {
-    required String date,
-    required String description,
-    required String amount,
-    required bool isCompleted,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: isCompleted
-                  ? Colors.green.shade100
-                  : Colors.orange.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              isCompleted ? Icons.check : Icons.access_time,
-              color: isCompleted
-                  ? Colors.green.shade700
-                  : Colors.orange.shade700,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  description,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-                Text(
-                  date,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            amount,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: isCompleted
-                  ? Colors.green.shade700
-                  : Colors.orange.shade700,
             ),
           ),
         ],

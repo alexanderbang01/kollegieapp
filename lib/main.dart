@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:kollegieapp/screens/contacts_screen.dart';
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/food_screen.dart';
+import 'screens/news_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/events_screen.dart';
 import 'services/theme_service.dart';
 import 'utils/constants.dart';
 import 'utils/theme.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  initializeDateFormatting('da_DK', null);
   runApp(
     ChangeNotifierProvider(create: (_) => ThemeService(), child: const MyApp()),
   );
@@ -35,8 +40,9 @@ class MyApp extends StatelessWidget {
             settingsRoute: (context) => const SettingsScreen(),
             foodRoute: (context) => const FoodScreen(),
             profileRoute: (context) => const ProfileScreen(),
-            // Andre sider vil blive tilføjet her efterhånden som de implementeres
-            // eventsRoute: (context) => const EventsScreen(),
+            eventsRoute: (context) => const EventsScreen(),
+            newsRoute: (context) => const NewsScreen(),
+            contactsRoute: (context) => const ContactsScreen(),
             // notificationsRoute: (context) => const NotificationsScreen(),
             // maintenanceRoute: (context) => const MaintenanceScreen(),
             // communityRoute: (context) => const CommunityScreen(),

@@ -12,13 +12,12 @@ class FoodScreen extends StatefulWidget {
 
 class _FoodScreenState extends State<FoodScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  int _selectedWeek = 18; // Nuværende uge (uge 18)
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // Madplanen for ugen
-    final List<Map<String, dynamic>> madplan = [
+  // Alle madplaner
+  final Map<int, List<Map<String, dynamic>>> _allMealPlans = {
+    // Uge 18 madplan
+    18: [
       {
         'dag': 'Mandag',
         'ret': 'Pasta Carbonara',
@@ -50,7 +49,48 @@ class _FoodScreenState extends State<FoodScreen> {
         'tid': '18:15',
         'allergener': ['Laktose'],
       },
-    ];
+    ],
+    // Uge 19 madplan
+    19: [
+      {
+        'dag': 'Mandag',
+        'ret': 'Lasagne',
+        'beskrivelse': 'Hjemmelavet lasagne med oksekød og bechamelsauce',
+        'tid': '18:00',
+        'allergener': ['Gluten', 'Laktose'],
+      },
+      {
+        'dag': 'Tirsdag',
+        'ret': 'Fiskefrikadeller',
+        'beskrivelse': 'Fiskefrikadeller med kartofler og remoulade',
+        'tid': '18:00',
+        'allergener': ['Fisk', 'Aeg'],
+      },
+      {
+        'dag': 'Onsdag',
+        'ret': 'Pizza aften',
+        'beskrivelse': 'Vi laver pizzaer sammen med forskellige toppings',
+        'tid': '18:30',
+        'allergener': ['Gluten', 'Laktose'],
+      },
+      {
+        'dag': 'Torsdag',
+        'ret': 'Falafler med couscous',
+        'beskrivelse': 'Vegetariske falafler med couscous og tzatziki',
+        'tid': '18:15',
+        'allergener': ['Gluten', 'Laktose'],
+        'vegetar': true,
+      },
+    ],
+  };
+
+  // Hent den valgte madplan
+  List<Map<String, dynamic>> get _currentMealPlan => 
+      _allMealPlans[_selectedWeek] ?? [];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
     return Scaffold(
       key: _scaffoldKey,
@@ -75,7 +115,6 @@ class _FoodScreenState extends State<FoodScreen> {
           ),
         ],
       ),
-      // Bruger den genbrugelige og forbedrede NavigationMenu-widget
       endDrawer: const NavigationMenu(currentRoute: foodRoute),
       body: SingleChildScrollView(
         child: Padding(
@@ -83,29 +122,75 @@ class _FoodScreenState extends State<FoodScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Denne uges madplan',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Spisetid: Kl. 18:00 - 19:30',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade700,
-                ),
+              // Uge selector og titel
+              Row(
+                children: [
+                  Text(
+                    'Madplan for uge $_selectedWeek',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Tilføjer knapper til at skifte uge
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: () {
+                      setState(() {
+                        _selectedWeek = _selectedWeek > 1 ? _selectedWeek - 1 : 52;
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: () {
+                      setState(() {
+                        _selectedWeek = _selectedWeek < 52 ? _selectedWeek + 1 : 1;
+                      });
+                    },
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 
+              // Viser "ingen madplan" besked hvis der ikke er data for den valgte uge
+              if (_currentMealPlan.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.restaurant_menu,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Ingen madplan for uge $_selectedWeek',
+                          style: theme.textTheme.titleMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Prøv en anden uge eller kontakt administrationen',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey.shade600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
               // Madplankort for hver dag
-              ...madplan
+              ..._currentMealPlan
                   .map(
                     (mad) => _buildMealCard(
                       context,
                       mad,
-                      highlightDay:
-                          mad['dag'] == 'Tirsdag', // Fremhæv kun tirsdag
+                      isToday: mad['dag'] == 'Tirsdag', // Markerer tirsdag som "I DAG" for eksemplets skyld
                     ),
                   )
                   .toList(),
@@ -119,23 +204,19 @@ class _FoodScreenState extends State<FoodScreen> {
   Widget _buildMealCard(
     BuildContext context,
     Map<String, dynamic> mad, {
-    bool highlightDay = false,
+    bool isToday = false,
   }) {
     final theme = Theme.of(context);
     final bool erVegetar = mad['vegetar'] == true;
 
     return Card(
-      elevation: highlightDay ? 2 : 0,
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: highlightDay
-            ? BorderSide(color: theme.colorScheme.primary, width: 2)
-            : BorderSide.none,
+        side: BorderSide.none,
       ),
-      color: highlightDay
-          ? theme.colorScheme.primary.withOpacity(0.1)
-          : theme.colorScheme.primary.withOpacity(0.05),
+      color: theme.colorScheme.primary.withOpacity(0.05),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -154,7 +235,7 @@ class _FoodScreenState extends State<FoodScreen> {
                         color: theme.colorScheme.primary,
                       ),
                     ),
-                    if (highlightDay)
+                    if (isToday)
                       Container(
                         margin: const EdgeInsets.only(left: 8),
                         padding: const EdgeInsets.symmetric(

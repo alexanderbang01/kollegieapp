@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/theme.dart'; // Importerer AppTheme
+import '../utils/theme.dart';
 
 // App information
 const String appName = 'Mercantec Kollegium';
@@ -15,6 +15,8 @@ const String communityRoute = '/community';
 const String profileRoute = '/profile';
 const String settingsRoute = '/settings';
 const String aboutRoute = '/about';
+const String newsRoute = '/news';
+const String contactsRoute = '/contacts';
 
 // Tekststrenge
 class AppText {
@@ -28,6 +30,8 @@ class AppText {
   static const String profileTitle = 'Profil';
   static const String settingsTitle = 'Indstillinger';
   static const String aboutTitle = 'Om Appen';
+  static const String newsTitle = 'Nyheder';
+  static const String contactsTitle = 'Kontaktpersoner';
 
   static const String darkModeSwitch = 'Mørk tilstand';
   static const String notificationsSwitch = 'Notifikationer';
@@ -45,6 +49,8 @@ class AppIcons {
   static const IconData profile = Icons.person;
   static const IconData settings = Icons.settings;
   static const IconData about = Icons.info;
+  static const IconData news = Icons.newspaper;
+  static const IconData contacts = Icons.contact_phone;
 
   static const IconData darkMode = Icons.dark_mode;
   static const IconData lightMode = Icons.light_mode;

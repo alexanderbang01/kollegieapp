@@ -31,17 +31,16 @@ class NavigationMenu extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      // Rundt logo
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(40),
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          color: Colors.white,
-                          padding: const EdgeInsets.all(8),
-                          child: Image.asset(
-                            'assets/logo.png',
-                            fit: BoxFit.contain,
+                      // Cirkel med brugerinitialer i stedet for logo
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Colors.white,
+                        child: Text(
+                          'AJ', // Initialer for Alexander Jensen
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
                           ),
                         ),
                       ),
@@ -69,14 +68,6 @@ class NavigationMenu extends StatelessWidget {
                             SizedBox(height: 2),
                             Text(
                               'alexander@example.com',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Tlf: +45 12 34 56 78',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 12,
@@ -133,6 +124,20 @@ class NavigationMenu extends StatelessWidget {
                   route: eventsRoute,
                   isActive: currentRoute == eventsRoute,
                 ),
+                _buildNavItem(
+                  context: context,
+                  icon: AppIcons.news,
+                  title: AppText.newsTitle,
+                  route: newsRoute,
+                  isActive: currentRoute == newsRoute,
+                ),
+                _buildNavItem(
+  context: context,
+  icon: AppIcons.contacts,
+  title: AppText.contactsTitle,
+  route: contactsRoute,
+  isActive: currentRoute == contactsRoute,
+),
 
                 // Divider for at separere navigation og personlige indstillinger
                 const Padding(
