@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../utils/constants.dart';
 import '../widgets/navigation_menu.dart';
+import '../widgets/success_notification.dart';
+import '../services/employees_service.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({Key? key}) : super(key: key);
@@ -11,47 +14,23 @@ class ContactsScreen extends StatefulWidget {
 
 class _ContactsScreenState extends State<ContactsScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
-  // Eksempel på kontaktpersoner for kollegiet - kun Ansatte-kategorien
-  final List<Map<String, dynamic>> _contacts = [
-    {
-      'name': 'Lars Hansen',
-      'role': 'Vicevært',
-      'phone': '+45 11 22 33 44',
-      'email': 'lars@kollegiet.dk',
-      'imageUrl': 'assets/images/contacts/lars.jpg',
-    },
-    {
-      'name': 'Maria Nielsen',
-      'role': 'Administration',
-      'phone': '+45 22 33 44 55',
-      'email': 'maria@kollegiet.dk',
-      'imageUrl': 'assets/images/contacts/maria.jpg',
-    },
-    {
-      'name': 'Henrik Madsen',
-      'role': 'IT-Support',
-      'phone': '+45 33 44 55 66',
-      'email': 'it@kollegiet.dk',
-      'imageUrl': 'assets/images/contacts/henrik.jpg',
-    },
-    {
-      'name': 'Anne Sørensen',
-      'role': 'Vaskeansvarlig',
-      'phone': '+45 44 55 66 77',
-      'email': 'vaskeri@kollegiet.dk',
-      'imageUrl': 'assets/images/contacts/anne.jpg',
-    },
-    {
-      'name': 'Peter Jensen',
-      'role': 'Pedel',
-      'phone': '+45 55 66 77 88',
-      'email': 'pedel@kollegiet.dk',
-      'imageUrl': 'assets/images/contacts/peter.jpg',
-    },
-  ];
+  // State variabler
+  String _searchQuery = '';
+  bool _isLoading = true;
+  bool _isSearching = false;
+  String? _errorMessage;
+
+  // Data
+  List<Map<String, dynamic>> _allContacts = [];
+  List<Map<String, dynamic>> _filteredContacts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContacts();
+  }
 
   @override
   void dispose() {
@@ -59,18 +38,156 @@ class _ContactsScreenState extends State<ContactsScreen> {
     super.dispose();
   }
 
-  // Filtrerede kontakter baseret på søgning
-  List<Map<String, dynamic>> get _filteredContacts {
-    if (_searchQuery.isEmpty) {
-      return _contacts;
-    }
-    return _contacts.where((contact) {
-      final name = contact['name'].toString().toLowerCase();
-      final role = contact['role'].toString().toLowerCase();
-      final searchLower = _searchQuery.toLowerCase();
+  Future<void> _loadContacts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-      return name.contains(searchLower) || role.contains(searchLower);
-    }).toList();
+    try {
+      final response = await EmployeesService.getEmployees();
+
+      if (response['success'] == true) {
+        final List<dynamic> contactsData = response['data'] ?? [];
+        setState(() {
+          _allContacts = List<Map<String, dynamic>>.from(contactsData);
+          _filteredContacts = _allContacts;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage =
+              response['message'] ?? 'Fejl ved indlæsning af kontakter';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Netværksfejl: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _filteredContacts = _allContacts;
+        _searchQuery = '';
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _searchQuery = query;
+    });
+
+    try {
+      final response = await EmployeesService.searchEmployees(query: query);
+
+      if (response['success'] == true) {
+        final List<dynamic> searchResults = response['data'] ?? [];
+        setState(() {
+          _filteredContacts = List<Map<String, dynamic>>.from(searchResults);
+          _isSearching = false;
+        });
+      } else {
+        setState(() {
+          _filteredContacts = [];
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _filteredContacts = [];
+        _isSearching = false;
+      });
+    }
+  }
+
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _filteredContacts = _allContacts;
+      _isSearching = false;
+    });
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    if (phoneNumber.isEmpty) {
+      SuccessNotification.show(
+        context,
+        title: 'Intet telefonnummer',
+        message: 'Denne kontakt har ikke et telefonnummer',
+        icon: Icons.phone_disabled,
+        color: Colors.orange,
+      );
+      return;
+    }
+
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri);
+      } else {
+        SuccessNotification.show(
+          context,
+          title: 'Kunne ikke ringe',
+          message: 'Telefonfunktion ikke tilgængelig på denne enhed',
+          icon: Icons.phone_disabled,
+          color: Colors.red,
+        );
+      }
+    } catch (e) {
+      SuccessNotification.show(
+        context,
+        title: 'Opkaldsfejl',
+        message: 'Der opstod en fejl ved opkald',
+        icon: Icons.error_outline,
+        color: Colors.red,
+      );
+    }
+  }
+
+  Future<void> _sendEmail(String email) async {
+    if (email.isEmpty) {
+      SuccessNotification.show(
+        context,
+        title: 'Ingen email',
+        message: 'Denne kontakt har ikke en email-adresse',
+        icon: Icons.email_outlined,
+        color: Colors.orange,
+      );
+      return;
+    }
+
+    final Uri launchUri = Uri(scheme: 'mailto', path: email);
+
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri);
+      } else {
+        SuccessNotification.show(
+          context,
+          title: 'Kunne ikke sende email',
+          message: 'Email-app ikke tilgængelig på denne enhed',
+          icon: Icons.email_outlined,
+          color: Colors.red,
+        );
+      }
+    } catch (e) {
+      SuccessNotification.show(
+        context,
+        title: 'Email-fejl',
+        message: 'Der opstod en fejl ved afsendelse af email',
+        icon: Icons.error_outline,
+        color: Colors.red,
+      );
+    }
   }
 
   @override
@@ -111,16 +228,20 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Søg efter kontaktperson...',
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: _isSearching
+                      ? const Padding(
+                          padding: EdgeInsets.all(14.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : const Icon(Icons.search),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            });
-                          },
+                          onPressed: _clearSearch,
                         )
                       : null,
                   filled: true,
@@ -132,41 +253,93 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     borderSide: BorderSide.none,
                   ),
                 ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
+                onChanged: (value) => _performSearch(value),
               ),
             ),
 
-            // Kontaktliste
-            Expanded(
-              child: _filteredContacts.isEmpty
-                  ? _buildEmptyState()
-                  : _buildContactsList(),
-            ),
+            // Content
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Indlæser kontaktpersoner...'),
+          ],
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 80, color: Colors.red.shade300),
+            const SizedBox(height: 16),
+            Text(
+              'Der opstod en fejl',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                _errorMessage!,
+                style: TextStyle(color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadContacts,
+              child: const Text('Prøv igen'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_filteredContacts.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return _buildContactsList();
+  }
+
   Widget _buildEmptyState() {
+    final isSearch = _searchQuery.isNotEmpty;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, size: 80, color: Colors.grey.shade400),
+          Icon(
+            isSearch ? Icons.search_off : Icons.contacts,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
           const SizedBox(height: 16),
           Text(
-            'Ingen kontaktpersoner fundet',
+            isSearch ? 'Ingen kontaktpersoner fundet' : 'Ingen kontaktpersoner',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
           Text(
-            'Prøv at søge efter noget andet',
+            isSearch
+                ? 'Prøv at søge efter noget andet'
+                : 'Der er ikke registreret nogle kontaktpersoner endnu',
             style: TextStyle(color: Colors.grey.shade600),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -174,13 +347,16 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Widget _buildContactsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      itemCount: _filteredContacts.length,
-      itemBuilder: (context, index) {
-        final contact = _filteredContacts[index];
-        return _buildContactCard(contact);
-      },
+    return RefreshIndicator(
+      onRefresh: _loadContacts,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        itemCount: _filteredContacts.length,
+        itemBuilder: (context, index) {
+          final contact = _filteredContacts[index];
+          return _buildContactCard(contact);
+        },
+      ),
     );
   }
 
@@ -203,14 +379,25 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                  child: Text(
-                    contact['name'].substring(0, 1),
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                    ),
-                  ),
+                  backgroundImage:
+                      contact['profile_image'] != null &&
+                          contact['profile_image'].isNotEmpty
+                      ? NetworkImage(contact['profile_image'])
+                      : null,
+                  child:
+                      contact['profile_image'] == null ||
+                          contact['profile_image'].isEmpty
+                      ? Text(
+                          contact['initials'] ??
+                              contact['name']?.substring(0, 1) ??
+                              'U',
+                          style: TextStyle(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 22,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -218,7 +405,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        contact['name'],
+                        contact['name'] ?? 'Ukendt navn',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -235,7 +422,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          contact['role'],
+                          contact['role'] ?? 'Ukendt rolle',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -254,10 +441,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
             // Telefonnummer (kan trykkes på)
             InkWell(
-              onTap: () {
-                // Implementer opkaldsfunktionalitet her
-                // url_launcher: launch("tel:${contact['phone']}")
-              },
+              onTap: () => _makePhoneCall(contact['phone'] ?? ''),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Row(
@@ -269,7 +453,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      contact['phone'],
+                      contact['phone'] ?? 'Intet telefonnummer',
                       style: TextStyle(
                         fontSize: 16,
                         color: theme.colorScheme.primary,
@@ -283,10 +467,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
             // Email (kan trykkes på)
             InkWell(
-              onTap: () {
-                // Implementer email-funktionalitet her
-                // url_launcher: launch("mailto:${contact['email']}")
-              },
+              onTap: () => _sendEmail(contact['email'] ?? ''),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Row(
@@ -297,12 +478,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
                       color: theme.colorScheme.secondary,
                     ),
                     const SizedBox(width: 12),
-                    Text(
-                      contact['email'],
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: theme.colorScheme.secondary,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        contact['email'] ?? 'Ingen email',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: theme.colorScheme.secondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

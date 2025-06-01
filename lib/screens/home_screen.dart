@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../utils/constants.dart';
 import '../widgets/navigation_menu.dart';
+import '../services/user_service.dart';
+import '../services/foodplan_service.dart';
+import '../services/events_service.dart';
+import '../services/news_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -11,6 +15,333 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  // User data
+  String _userName = '';
+  String _userInitials = '';
+  String _currentUserId = '';
+  String _currentUserType = '';
+  String? _profileImageUrl;
+
+  // Madplan data
+  List<Map<String, dynamic>> _weekMeals = [];
+  bool _loadingMeals = true;
+
+  // Events data
+  List<Map<String, dynamic>> _upcomingEvents = [];
+  bool _loadingEvents = true;
+
+  // News data
+  List<Map<String, dynamic>> _latestNews = [];
+  bool _loadingNews = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await _loadUserData();
+    await _loadWeekMeals();
+    await _loadUpcomingEvents();
+    await _loadLatestNews();
+  }
+
+  Future<void> _refreshData() async {
+    await Future.wait([
+      _loadUserData(),
+      _loadWeekMeals(),
+      _loadUpcomingEvents(),
+      _loadLatestNews(),
+    ]);
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final fullName = await UserService.getFullName();
+      final initials = await UserService.getUserInitials();
+      final userId = await UserService.getUserId();
+      final userType = await UserService.getUserType();
+      final profileImageUrl = await UserService.getProfileImageUrl();
+
+      if (mounted) {
+        setState(() {
+          _userName = fullName.isNotEmpty ? fullName : 'Bruger';
+          _userInitials = initials;
+          _currentUserId = userId;
+          _currentUserType = userType;
+          _profileImageUrl = profileImageUrl;
+        });
+      }
+    } catch (e) {
+      print('Fejl ved indlæsning af brugerdata: $e');
+      if (mounted) {
+        setState(() {
+          _userName = 'Bruger';
+          _userInitials = 'U';
+          _profileImageUrl = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadWeekMeals() async {
+    setState(() {
+      _loadingMeals = true;
+    });
+
+    try {
+      final response = await FoodplanService.getCurrentWeekFoodplan();
+
+      if (response['success'] == true && response['data'] != null) {
+        final meals = response['data']['meals'] as List<dynamic>? ?? [];
+        setState(() {
+          _weekMeals = List<Map<String, dynamic>>.from(meals);
+          _loadingMeals = false;
+        });
+      } else {
+        setState(() {
+          _weekMeals = [];
+          _loadingMeals = false;
+        });
+      }
+    } catch (e) {
+      print('Fejl ved indlæsning af madplan: $e');
+      setState(() {
+        _weekMeals = [];
+        _loadingMeals = false;
+      });
+    }
+  }
+
+  Future<void> _loadUpcomingEvents() async {
+    setState(() {
+      _loadingEvents = true;
+    });
+
+    if (_currentUserId.isEmpty || _currentUserType.isEmpty) {
+      setState(() {
+        _upcomingEvents = [];
+        _loadingEvents = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await EventsService.getUpcomingEvents(
+        userId: _currentUserId,
+        userType: _currentUserType,
+        limit: 2,
+      );
+
+      if (response['success'] == true && response['data'] != null) {
+        final events = response['data'] as List<dynamic>? ?? [];
+        setState(() {
+          _upcomingEvents = List<Map<String, dynamic>>.from(events);
+          _loadingEvents = false;
+        });
+      } else {
+        setState(() {
+          _upcomingEvents = [];
+          _loadingEvents = false;
+        });
+      }
+    } catch (e) {
+      print('Fejl ved indlæsning af begivenheder: $e');
+      setState(() {
+        _upcomingEvents = [];
+        _loadingEvents = false;
+      });
+    }
+  }
+
+  Future<void> _loadLatestNews() async {
+    setState(() {
+      _loadingNews = true;
+    });
+
+    if (_currentUserId.isEmpty) {
+      setState(() {
+        _latestNews = [];
+        _loadingNews = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await NewsService.getLatestNews(
+        userId: _currentUserId,
+        limit: 2,
+      );
+
+      if (response['success'] == true && response['data'] != null) {
+        final news = response['data'] as List<dynamic>? ?? [];
+        setState(() {
+          _latestNews = List<Map<String, dynamic>>.from(news);
+          _loadingNews = false;
+        });
+      } else {
+        setState(() {
+          _latestNews = [];
+          _loadingNews = false;
+        });
+      }
+    } catch (e) {
+      print('Fejl ved indlæsning af nyheder: $e');
+      setState(() {
+        _latestNews = [];
+        _loadingNews = false;
+      });
+    }
+  }
+
+  Future<void> _toggleEventRegistration(Map<String, dynamic> event) async {
+    final eventId = event['id'] as int;
+    final isRegistered = event['isUserRegistered'] as bool;
+
+    try {
+      final response = await EventsService.toggleEventRegistration(
+        userId: _currentUserId,
+        userType: _currentUserType,
+        eventId: eventId,
+        isCurrentlyRegistered: isRegistered,
+      );
+
+      if (response['success'] == true) {
+        setState(() {
+          final eventIndex = _upcomingEvents.indexWhere(
+            (e) => e['id'] == eventId,
+          );
+          if (eventIndex != -1) {
+            _upcomingEvents[eventIndex]['isUserRegistered'] = !isRegistered;
+
+            final currentParticipants =
+                _upcomingEvents[eventIndex]['currentParticipants'] as int;
+
+            if (!isRegistered) {
+              _upcomingEvents[eventIndex]['currentParticipants'] =
+                  currentParticipants + 1;
+            } else {
+              _upcomingEvents[eventIndex]['currentParticipants'] =
+                  currentParticipants - 1;
+            }
+          }
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['message']),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['message'] ?? 'Fejl ved tilmelding'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Netværksfejl: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _onNewsCardTap(Map<String, dynamic> news) async {
+    // Marker som læst før navigation
+    try {
+      await NewsService.markNewsAsRead(
+        userId: _currentUserId,
+        newsId: news['id'] as int,
+      );
+    } catch (e) {
+      print('Fejl ved markering som læst: $e');
+    }
+
+    // Naviger til news screen
+    Navigator.pushNamed(context, newsRoute);
+  }
+
+  String _getTodayMeal() {
+    if (_weekMeals.isEmpty) return 'Ingen ret i dag';
+
+    final today = DateTime.now().weekday;
+    const dayNames = [
+      'Mandag',
+      'Tirsdag',
+      'Onsdag',
+      'Torsdag',
+      'Fredag',
+      'Lørdag',
+      'Søndag',
+    ];
+
+    if (today <= dayNames.length) {
+      final todayName = dayNames[today - 1];
+
+      for (final meal in _weekMeals) {
+        if (meal['dag'] == todayName) {
+          return meal['ret'] ?? 'Ingen ret';
+        }
+      }
+    }
+
+    return 'Ingen ret i dag';
+  }
+
+  List<Map<String, dynamic>> _getUpcomingMeals() {
+    if (_weekMeals.isEmpty) return [];
+
+    final today = DateTime.now().weekday;
+    const dayNames = [
+      'Mandag',
+      'Tirsdag',
+      'Onsdag',
+      'Torsdag',
+      'Fredag',
+      'Lørdag',
+      'Søndag',
+    ];
+
+    List<Map<String, dynamic>> upcomingMeals = [];
+
+    for (int i = 0; i < 3; i++) {
+      final dayIndex = (today - 1 + i) % 7;
+      if (dayIndex < dayNames.length) {
+        final dayName = dayNames[dayIndex];
+
+        for (final meal in _weekMeals) {
+          if (meal['dag'] == dayName) {
+            String displayDay;
+            if (i == 0) {
+              displayDay = 'I dag';
+            } else if (i == 1) {
+              displayDay = 'I morgen';
+            } else {
+              displayDay = dayName;
+            }
+
+            upcomingMeals.add({...meal, 'displayDay': displayDay});
+            break;
+          }
+        }
+      }
+    }
+
+    return upcomingMeals;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,201 +354,350 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // App Bar med KUN ÉN menu knap
-            SliverAppBar(
-              floating: true,
-              pinned: false,
-              automaticallyImplyLeading: false,
-              backgroundColor: theme.scaffoldBackgroundColor,
-              elevation: 0,
-              title: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: theme.colorScheme.primary,
-                    child: const Text(
-                      'AJ',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Hej Alexander',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: theme.brightness == Brightness.light
-                              ? Colors.black87
-                              : Colors.white, // Tilpas farve til dark mode
-                        ),
-                      ),
-                      Text(
-                        formattedDate,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.brightness == Brightness.light
-                              ? Colors.grey
-                              : Colors.grey[300], // Lysere grå i dark mode
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                ],
-              ),
-              actions: [
-                // Kun én menu knap her i actions
-                IconButton(
-                  icon: Icon(
-                    Icons.menu,
-                    color: theme.colorScheme.primary,
-                    size: 28,
-                  ),
-                  onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-                ),
-              ],
-            ),
-
-            // Content
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: RefreshIndicator(
+          onRefresh: _refreshData,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // App Bar med brugerdata fra UserService
+              SliverAppBar(
+                floating: true,
+                pinned: false,
+                automaticallyImplyLeading: false,
+                backgroundColor: theme.scaffoldBackgroundColor,
+                elevation: 0,
+                title: Row(
                   children: [
-                    // Dagens oversigt
-                    _buildDaySummaryCard(context, size),
-                    const SizedBox(height: 24),
-
-                    // Madplan sektion med horisontal scroll
-                    _buildSectionWithSeeAll(
-                      context,
-                      'Madplan',
-                      onPressed: () => Navigator.pushNamed(context, foodRoute),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: theme.colorScheme.primary,
+                      backgroundImage: _profileImageUrl != null
+                          ? NetworkImage(_profileImageUrl!)
+                          : null,
+                      child: _profileImageUrl == null
+                          ? Text(
+                              _userInitials,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 160,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _buildHorizontalMealCard(
-                            context,
-                            'I dag',
-                            'Pasta Carbonara',
-                            'Serveres kl. 18:00',
-                            Icons.restaurant,
-                            theme.colorScheme.primary,
-                            onTap: () =>
-                                Navigator.pushNamed(context, foodRoute),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hej ${_userName.split(' ').first}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: theme.brightness == Brightness.light
+                                ? Colors.black87
+                                : Colors.white,
                           ),
-                          _buildHorizontalMealCard(
-                            context,
-                            'I morgen',
-                            'Taco Tirsdag',
-                            'Serveres kl. 18:00',
-                            Icons.restaurant,
-                            theme.colorScheme.primary,
-                            onTap: () =>
-                                Navigator.pushNamed(context, foodRoute),
+                        ),
+                        Text(
+                          formattedDate,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.brightness == Brightness.light
+                                ? Colors.grey
+                                : Colors.grey[300],
                           ),
-                          _buildHorizontalMealCard(
-                            context,
-                            'Onsdag',
-                            'Buddha Bowl',
-                            'Serveres kl. 18:00',
-                            Icons.restaurant,
-                            theme.colorScheme.primary,
-                            onTap: () =>
-                                Navigator.pushNamed(context, foodRoute),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Kommende begivenheder
-                    _buildSectionWithSeeAll(
-                      context,
-                      'Kommende Begivenheder',
-                      onPressed: () =>
-                          Navigator.pushNamed(context, eventsRoute),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildModernEventCard(
-                      context,
-                      title: 'Filmaften',
-                      description:
-                          'Vi mødes i fællesrummet og ser en film sammen. Der vil være popcorn og sodavand!',
-                      location: 'Fællesrummet',
-                      time: 'Fredag, 20:00',
-                      attendees: 12,
-                      capacity: 25,
-                      isHighlighted: true,
-                      onTap: () => Navigator.pushNamed(context, eventsRoute),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildModernEventCard(
-                      context,
-                      title: 'Brætspilsaften',
-                      description:
-                          'Tag dine yndlingsbrætspil med til en hyggelig aften.',
-                      location: 'Fællesrummet, 3. etage',
-                      time: 'Lørdag, 19:00',
-                      attendees: 8,
-                      capacity: 20,
-                      isHighlighted: false,
-                      onTap: () => Navigator.pushNamed(context, eventsRoute),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Nyheder
-                    _buildSectionWithSeeAll(
-                      context,
-                      'Nyheder',
-                      onPressed: () => Navigator.pushNamed(context, newsRoute),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNewsCardModern(
-                      context,
-                      title: 'Ny trådløs printer installeret',
-                      content:
-                          'Du kan nu printe fra din enhed i fællesrummet via Wi-Fi.',
-                      date: '12. maj',
-                      isNew: true,
-                      onTap: () => Navigator.pushNamed(context, newsRoute),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNewsCardModern(
-                      context,
-                      title: 'Sommerfest planlægges',
-                      content:
-                          'Sæt kryds i kalenderen: Vi planlægger årets sommerfest den 15. juni.',
-                      date: '10. maj',
-                      isNew: false,
-                      onTap: () => Navigator.pushNamed(context, newsRoute),
-                    ),
-
-                    const SizedBox(height: 30),
+                    const Spacer(),
                   ],
                 ),
+                actions: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.menu,
+                      color: theme.colorScheme.primary,
+                      size: 28,
+                    ),
+                    onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+                  ),
+                ],
               ),
-            ),
-          ],
+
+              // Content
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Dagens oversigt
+                      _buildDaySummaryCard(context, size),
+                      const SizedBox(height: 24),
+
+                      // Madplan sektion med horisontal scroll
+                      _buildSectionWithSeeAll(
+                        context,
+                        'Madplan',
+                        onPressed: () =>
+                            Navigator.pushNamed(context, foodRoute),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMealPlanSection(),
+
+                      const SizedBox(height: 24),
+
+                      // Kommende begivenheder
+                      _buildSectionWithSeeAll(
+                        context,
+                        'Kommende Begivenheder',
+                        onPressed: () =>
+                            Navigator.pushNamed(context, eventsRoute),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildEventsSection(),
+
+                      const SizedBox(height: 24),
+
+                      // Nyheder
+                      _buildSectionWithSeeAll(
+                        context,
+                        'Nyheder',
+                        onPressed: () =>
+                            Navigator.pushNamed(context, newsRoute),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildNewsSection(),
+
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       endDrawer: const NavigationMenu(currentRoute: homeRoute),
     );
+  }
+
+  Widget _buildEventsSection() {
+    if (_loadingEvents) {
+      return SizedBox(
+        height: 160,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 8),
+              Text(
+                'Indlæser begivenheder...',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_upcomingEvents.isEmpty) {
+      return SizedBox(
+        height: 160,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.event_busy, color: Colors.grey.shade400),
+              const SizedBox(height: 8),
+              Text(
+                'Ingen kommende begivenheder',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, eventsRoute),
+                child: const Text('Se alle begivenheder'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: _upcomingEvents.asMap().entries.map((entry) {
+        final index = entry.key;
+        final event = entry.value;
+        final isFirst = index == 0;
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: index < _upcomingEvents.length - 1 ? 12 : 0,
+          ),
+          child: _buildModernEventCard(
+            context,
+            event: event,
+            isHighlighted: isFirst,
+            onTap: () => Navigator.pushNamed(context, eventsRoute),
+            onToggleRegistration: () => _toggleEventRegistration(event),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildMealPlanSection() {
+    if (_loadingMeals) {
+      return SizedBox(
+        height: 160,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 8),
+              Text(
+                'Indlæser madplan...',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_weekMeals.isEmpty) {
+      return SizedBox(
+        height: 160,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.restaurant_menu, color: Colors.grey.shade400),
+              const SizedBox(height: 8),
+              Text(
+                'Ingen madplan denne uge',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final upcomingMeals = _getUpcomingMeals();
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      height: 160,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: upcomingMeals.length,
+        itemBuilder: (context, index) {
+          final meal = upcomingMeals[index];
+          return _buildHorizontalMealCard(
+            context,
+            meal['displayDay'] ?? meal['dag'],
+            meal['ret'] ?? 'Ingen ret',
+            'Serveres kl. ${meal['tid'] ?? '18:00'}',
+            Icons.restaurant,
+            theme.colorScheme.primary,
+            onTap: () => Navigator.pushNamed(context, foodRoute),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildNewsSection() {
+    if (_loadingNews) {
+      return SizedBox(
+        height: 160,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 8),
+              Text(
+                'Indlæser nyheder...',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_latestNews.isEmpty) {
+      return SizedBox(
+        height: 160,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.newspaper, color: Colors.grey.shade400),
+              const SizedBox(height: 8),
+              Text(
+                'Ingen nyheder',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: _latestNews.asMap().entries.map((entry) {
+        final index = entry.key;
+        final news = entry.value;
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: index < _latestNews.length - 1 ? 12 : 0,
+          ),
+          child: _buildNewsCardModern(
+            context,
+            title: news['title'] ?? '',
+            content: news['content'] ?? '',
+            date: _formatNewsDate(news['published_at']),
+            isNew: news['is_recent'] ?? false,
+            onTap: () => _onNewsCardTap(news),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _formatNewsDate(String? dateString) {
+    if (dateString == null) return '';
+
+    try {
+      final date = DateTime.parse(dateString);
+
+      // Danske månedsnavne
+      final months = [
+        'januar',
+        'februar',
+        'marts',
+        'april',
+        'maj',
+        'juni',
+        'juli',
+        'august',
+        'september',
+        'oktober',
+        'november',
+        'december',
+      ];
+
+      return '${date.day}. ${months[date.month - 1]}';
+    } catch (e) {
+      return dateString;
+    }
   }
 
   // Hjælpefunktioner til datoformatering uden brug af intl
@@ -254,6 +734,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDaySummaryCard(BuildContext context, Size size) {
     final theme = Theme.of(context);
+    final todayMeal = _getTodayMeal();
 
     return Container(
       width: double.infinity,
@@ -303,17 +784,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.event_available,
                             color: Colors.white,
                             size: 14,
                           ),
-                          SizedBox(width: 4),
+                          const SizedBox(width: 4),
                           Text(
-                            '2 begivenheder i dag',
-                            style: TextStyle(
+                            '${_upcomingEvents.length} begivenheder i dag',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
@@ -347,9 +828,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Pasta Carbonara',
-                  style: TextStyle(
+                Text(
+                  todayMeal,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -470,17 +951,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildModernEventCard(
     BuildContext context, {
-    required String title,
-    required String description,
-    required String location,
-    required String time,
-    required int attendees,
-    required int capacity,
+    required Map<String, dynamic> event,
     required bool isHighlighted,
     required VoidCallback onTap,
+    VoidCallback? onToggleRegistration,
   }) {
     final theme = Theme.of(context);
-    final attendeePercent = attendees / capacity;
+    final currentParticipants = event['currentParticipants'] ?? 0;
+    final maxParticipants = event['maxParticipants'];
+    final attendeePercent = maxParticipants != null
+        ? currentParticipants / maxParticipants
+        : 0.0;
+    final isUserRegistered = event['isUserRegistered'] ?? false;
+
+    final eventDate = DateTime.parse(event['date']);
+    final isToday = _isToday(eventDate);
 
     return Card(
       elevation: isHighlighted ? 4 : 1,
@@ -524,7 +1009,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          title,
+                          event['title'] ?? '',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -532,7 +1017,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          time,
+                          _formatEventDateTime(event),
                           style: TextStyle(
                             color: Colors.grey[700],
                             fontSize: 13,
@@ -541,7 +1026,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
-                  if (isHighlighted)
+                  if (isToday)
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -564,7 +1049,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                description,
+                event['description'] ?? '',
                 style: TextStyle(color: Colors.grey[800], fontSize: 14),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -576,7 +1061,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      location,
+                      event['location'] ?? '',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -588,42 +1073,55 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 children: [
                   // Attendee progress
-                  Stack(
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(3),
+                  if (maxParticipants != null) ...[
+                    Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(3),
+                          ),
                         ),
-                      ),
-                      Container(
-                        width: 100 * attendeePercent,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: attendeePercent > 0.8
-                              ? Colors.orange
-                              : theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(3),
+                        Container(
+                          width: 100.0 * attendeePercent,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: attendeePercent > 0.8
+                                ? Colors.orange
+                                : theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$attendees/$capacity',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
+                      ],
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$currentParticipants/$maxParticipants',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      '$currentParticipants deltagere',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   ElevatedButton(
-                    onPressed: onTap,
+                    onPressed: onToggleRegistration,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
+                      backgroundColor: isUserRegistered
+                          ? Colors.red
+                          : theme.colorScheme.primary,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -633,9 +1131,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Tilmeld',
-                      style: TextStyle(
+                    child: Text(
+                      isUserRegistered ? 'Afmeld' : 'Tilmeld',
+                      style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -648,6 +1146,62 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.day == now.day &&
+        date.month == now.month &&
+        date.year == now.year;
+  }
+
+  String _formatEventDateTime(Map<String, dynamic> event) {
+    try {
+      final date = DateTime.parse(event['date']);
+      final time = event['time'] ?? '';
+
+      final now = DateTime.now();
+      String dateStr;
+
+      if (date.day == now.day &&
+          date.month == now.month &&
+          date.year == now.year) {
+        dateStr = 'I dag';
+      } else {
+        final tomorrow = now.add(const Duration(days: 1));
+        if (date.day == tomorrow.day &&
+            date.month == tomorrow.month &&
+            date.year == tomorrow.year) {
+          dateStr = 'I morgen';
+        } else {
+          final dayNames = [
+            'Mandag',
+            'Tirsdag',
+            'Onsdag',
+            'Torsdag',
+            'Fredag',
+            'Lørdag',
+            'Søndag',
+          ];
+          dateStr = dayNames[date.weekday - 1];
+        }
+      }
+
+      // Format time
+      String timeStr = '';
+      if (time.isNotEmpty) {
+        final parts = time.split(':');
+        if (parts.length >= 2) {
+          timeStr = '${parts[0]}:${parts[1]}';
+        } else {
+          timeStr = time;
+        }
+      }
+
+      return timeStr.isNotEmpty ? '$dateStr, $timeStr' : dateStr;
+    } catch (e) {
+      return event['date'] ?? '';
+    }
   }
 
   Widget _buildNewsCardModern(

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../utils/constants.dart';
 import '../utils/theme.dart';
 import '../widgets/navigation_menu.dart';
+import '../widgets/success_notification.dart';
+import '../services/events_service.dart';
+import '../services/user_service.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({Key? key}) : super(key: key);
@@ -12,99 +15,221 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ScrollController _scrollController = ScrollController();
+
+  // User data
+  String _currentUserId = '';
+  String _currentUserType = '';
+
+  // UI state
   bool _showPastEvents = false;
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  String? _errorMessage;
 
-  // Dummydata for begivenheder
-  final List<Map<String, dynamic>> _events = [
-    {
-      'id': '1',
-      'title': 'Fællesspisning',
-      'description': 'Vi mødes i fælleskøkkenet og laver mad sammen. Medbring ingredienser efter aftale.',
-      'date': DateTime.now().add(const Duration(days: 2)),
-      'location': 'Fælleskøkkenet, 2. sal',
-      'organizer': 'Julie Hansen',
-      'maxParticipants': 15,
-      'currentParticipants': 3,
-      'participants': ['Alexander Jensen', 'Mia Nielsen', 'Søren Larsen'],
-      'imageUrl': 'assets/images/dinner.jpg',
-      'category': 'Mad',
-    },
-    {
-      'id': '2',
-      'title': 'Filmaften',
-      'description': 'Vi ser en film sammen i fællesrummet. Afstemning om filmen foregår på Facebook-gruppen.',
-      'date': DateTime.now().add(const Duration(days: 5)),
-      'location': 'Fællesrummet, stueetagen',
-      'organizer': 'Mikkel Andersen',
-      'maxParticipants': 25,
-      'currentParticipants': 3,
-      'participants': ['Alexander Jensen', 'Julie Hansen', 'Peter Olsen'],
-      'imageUrl': 'assets/images/movie.jpg',
-      'category': 'Underholdning',
-    },
-    {
-      'id': '3',
-      'title': 'Brætspilsaften',
-      'description': 'Tag dit yndlingsbrætspil med! Der vil også være snacks og sodavand.',
-      'date': DateTime.now().add(const Duration(days: 7)),
-      'location': 'Fællesrummet, stueetagen',
-      'organizer': 'Sofie Pedersen',
-      'maxParticipants': 20,
-      'currentParticipants': 2,
-      'participants': ['Mia Nielsen', 'Thomas Jensen'],
-      'imageUrl': 'assets/images/boardgame.jpg',
-      'category': 'Underholdning',
-    },
-    {
-      'id': '4',
-      'title': 'Generalforsamling',
-      'description': 'Årlig generalforsamling for kollegiet. Vigtigt at deltage!',
-      'date': DateTime.now().add(const Duration(days: 14)),
-      'location': 'Fællesrummet, stueetagen',
-      'organizer': 'Kollegiebestyrelsen',
-      'maxParticipants': 100,
-      'currentParticipants': 4,
-      'participants': ['Alexander Jensen', 'Julie Hansen', 'Mia Nielsen', 'Thomas Jensen'],
-      'imageUrl': 'assets/images/meeting.jpg',
-      'category': 'Møde',
-    },
-    {
-      'id': '5',
-      'title': 'Loppemarked',
-      'description': 'Kom og sælg dine brugte ting eller gør et godt køb!',
-      'date': DateTime.now().subtract(const Duration(days: 7)),
-      'location': 'Gården',
-      'organizer': 'Anna Poulsen',
-      'maxParticipants': 50,
-      'currentParticipants': 0,
-      'participants': [],
-      'imageUrl': 'assets/images/market.jpg',
-      'category': 'Andet',
-      'isPast': true,
-    },
-    {
-      'id': '6',
-      'title': 'Rengøringsdag',
-      'description': 'Vi hjælpes ad med at gøre fællesområderne rene. Kollegiet giver pizza bagefter!',
-      'date': DateTime.now().subtract(const Duration(days: 14)),
-      'location': 'Hele kollegiet',
-      'organizer': 'Kollegiebestyrelsen',
-      'maxParticipants': 100,
-      'currentParticipants': 0,
-      'participants': [],
-      'imageUrl': 'assets/images/cleaning.jpg',
-      'category': 'Praktisk',
-      'isPast': true,
-    },
-  ];
+  // Events data
+  List<Map<String, dynamic>> _events = [];
+  int _currentPage = 1;
+  bool _hasMore = true;
 
-  // Filtrering af begivenheder
-  List<Map<String, dynamic>> get _filteredEvents {
-    final now = DateTime.now();
-    return _events.where((event) {
-      final isPast = event['date'].isBefore(now);
-      return _showPastEvents ? isPast : !isPast;
-    }).toList();
+  @override
+  void initState() {
+    super.initState();
+    _initializeUser();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreEvents();
+    }
+  }
+
+  Future<void> _initializeUser() async {
+    try {
+      final userId = await UserService.getUserId();
+      final userType = await UserService.getUserType();
+
+      setState(() {
+        _currentUserId = userId;
+        _currentUserType = userType;
+      });
+
+      await _loadEvents();
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Fejl ved indlæsning af brugerdata: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadEvents({bool refresh = false}) async {
+    if (refresh) {
+      setState(() {
+        _currentPage = 1;
+        _hasMore = true;
+        _events.clear();
+      });
+    }
+
+    setState(() {
+      _isLoading = refresh || _currentPage == 1;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await EventsService.getEvents(
+        userId: _currentUserId,
+        userType: _currentUserType,
+        showPast: _showPastEvents,
+        page: _currentPage,
+        limit: 20,
+      );
+
+      if (response['success'] == true) {
+        final List<dynamic> eventsData = response['data'] ?? [];
+        final pagination = response['pagination'];
+
+        setState(() {
+          if (refresh || _currentPage == 1) {
+            _events = List<Map<String, dynamic>>.from(eventsData);
+          } else {
+            _events.addAll(List<Map<String, dynamic>>.from(eventsData));
+          }
+          _hasMore = pagination['has_next'] ?? false;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage =
+              response['message'] ?? 'Fejl ved indlæsning af begivenheder';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Netværksfejl: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMoreEvents() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() {
+      _isLoadingMore = true;
+      _currentPage++;
+    });
+
+    try {
+      final response = await EventsService.getEvents(
+        userId: _currentUserId,
+        userType: _currentUserType,
+        showPast: _showPastEvents,
+        page: _currentPage,
+        limit: 20,
+      );
+
+      if (response['success'] == true) {
+        final List<dynamic> eventsData = response['data'] ?? [];
+        final pagination = response['pagination'];
+
+        setState(() {
+          _events.addAll(List<Map<String, dynamic>>.from(eventsData));
+          _hasMore = pagination['has_next'] ?? false;
+          _isLoadingMore = false;
+        });
+      } else {
+        setState(() {
+          _currentPage--; // Revert page increment
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _currentPage--; // Revert page increment
+        _isLoadingMore = false;
+      });
+    }
+  }
+
+  Future<void> _toggleEventRegistration(Map<String, dynamic> event) async {
+    final eventId = event['id'] as int;
+    final isRegistered = event['isUserRegistered'] as bool;
+
+    try {
+      final response = await EventsService.toggleEventRegistration(
+        userId: _currentUserId,
+        userType: _currentUserType,
+        eventId: eventId,
+        isCurrentlyRegistered: isRegistered,
+      );
+
+      if (response['success'] == true) {
+        setState(() {
+          final eventIndex = _events.indexWhere((e) => e['id'] == eventId);
+          if (eventIndex != -1) {
+            _events[eventIndex]['isUserRegistered'] = !isRegistered;
+
+            final currentParticipants =
+                _events[eventIndex]['currentParticipants'] as int;
+
+            if (!isRegistered) {
+              _events[eventIndex]['currentParticipants'] =
+                  currentParticipants + 1;
+            } else {
+              _events[eventIndex]['currentParticipants'] =
+                  currentParticipants - 1;
+            }
+          }
+        });
+
+        if (mounted) {
+          SuccessNotification.show(
+            context,
+            title: !isRegistered ? 'Tilmeldt!' : 'Afmeldt!',
+            message:
+                response['message'] ??
+                (!isRegistered
+                    ? 'Du er nu tilmeldt begivenheden'
+                    : 'Du er nu afmeldt begivenheden'),
+            icon: !isRegistered
+                ? Icons.check_circle
+                : Icons.remove_circle_outline,
+            color: !isRegistered ? Colors.green : Colors.orange,
+          );
+        }
+      } else {
+        if (mounted) {
+          SuccessNotification.show(
+            context,
+            title: 'Fejl',
+            message: response['message'] ?? 'Fejl ved tilmelding',
+            icon: Icons.error_outline,
+            color: Colors.red,
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        SuccessNotification.show(
+          context,
+          title: 'Netværksfejl',
+          message: 'Der opstod en fejl. Prøv igen senere.',
+          icon: Icons.wifi_off,
+          color: Colors.red,
+        );
+      }
+    }
   }
 
   @override
@@ -134,6 +259,7 @@ class _EventsScreenState extends State<EventsScreen> {
               setState(() {
                 _showPastEvents = !_showPastEvents;
               });
+              _loadEvents(refresh: true);
             },
           ),
           IconButton(
@@ -143,70 +269,175 @@ class _EventsScreenState extends State<EventsScreen> {
         ],
       ),
       endDrawer: const NavigationMenu(currentRoute: eventsRoute),
-      body: _filteredEvents.isEmpty
-          ? _buildEmptyState()
-          : _buildEventsList(),
+      body: _buildBody(),
     );
   }
 
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Indlæser begivenheder...'),
+          ],
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 80, color: Colors.red.shade300),
+            const SizedBox(height: 16),
+            Text(
+              'Der opstod en fejl',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                _errorMessage!,
+                style: TextStyle(color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _loadEvents(refresh: true),
+              child: const Text('Prøv igen'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_events.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return _buildEventsList();
+  }
+
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            _showPastEvents ? Icons.history : Icons.event_busy,
-            size: 80,
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _showPastEvents
-                ? 'Ingen tidligere begivenheder'
-                : 'Ingen kommende begivenheder',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              _showPastEvents
-                  ? 'Der er ikke registreret tidligere begivenheder'
-                  : 'Opret en ny begivenhed ved at trykke på knappen nederst',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
+    return RefreshIndicator(
+      onRefresh: () => _loadEvents(refresh: true),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height - 200,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _showPastEvents ? Icons.history : Icons.event_busy,
+                  size: 80,
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _showPastEvents
+                      ? 'Ingen tidligere begivenheder'
+                      : 'Ingen kommende begivenheder',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    _showPastEvents
+                        ? 'Der er ikke registreret tidligere begivenheder'
+                        : 'Hold øje med nye begivenheder',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildEventsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredEvents.length,
-      itemBuilder: (context, index) {
-        final event = _filteredEvents[index];
-        return _buildEventCard(context, event);
-      },
+    return RefreshIndicator(
+      onRefresh: () => _loadEvents(refresh: true),
+      child: ListView.builder(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: _events.length + (_isLoadingMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _events.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          final event = _events[index];
+          return _buildEventCard(context, event);
+        },
+      ),
     );
   }
 
   Widget _buildEventCard(BuildContext context, Map<String, dynamic> event) {
     final theme = Theme.of(context);
-    final DateTime eventDate = event['date'];
-    final bool isToday = DateTime.now().day == eventDate.day &&
-        DateTime.now().month == eventDate.month &&
-        DateTime.now().year == eventDate.year;
+    final DateTime eventDateTime = DateTime.parse(
+      '${event['date']} ${event['time']}',
+    );
+    final bool isToday = _isToday(eventDateTime);
+    final bool isUserRegistered = event['isUserRegistered'] ?? false;
+    final bool isPast = _showPastEvents;
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+
+    // Bedre farver for past events
+    Color cardColor;
+    Color textColor;
+    Color secondaryTextColor;
+    Color progressBarColor;
+    Color progressBackgroundColor;
+
+    if (isPast) {
+      if (isDarkMode) {
+        // Dark mode - past events
+        cardColor = Colors.grey.shade800.withOpacity(0.6);
+        textColor = Colors.grey.shade400;
+        secondaryTextColor = Colors.grey.shade500;
+        progressBarColor = Colors.grey.shade600;
+        progressBackgroundColor = Colors.grey.shade700;
+      } else {
+        // Light mode - past events
+        cardColor = Colors.grey.shade200.withOpacity(0.8);
+        textColor = Colors.grey.shade700;
+        secondaryTextColor = Colors.grey.shade600;
+        progressBarColor = Colors.grey.shade500;
+        progressBackgroundColor = Colors.grey.shade300;
+      }
+    } else {
+      // Kommende events - normale farver
+      cardColor = theme.colorScheme.primary.withOpacity(0.1);
+      textColor = theme.colorScheme.onSurface;
+      secondaryTextColor = Colors.grey.shade700;
+      progressBarColor = theme.colorScheme.primary;
+      progressBackgroundColor = Colors.grey.shade200;
+    }
 
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      color: _getCategoryColor(event['category']).withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: cardColor,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _showEventDetails(context, event),
@@ -217,37 +448,20 @@ class _EventsScreenState extends State<EventsScreen> {
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getCategoryColor(event['category']),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                  Expanded(
                     child: Text(
-                      event['category'],
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
+                      event['title'],
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
                       ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _formatDate(eventDate),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade700,
                     ),
                   ),
                   if (isToday)
                     Container(
-                      margin: const EdgeInsets.only(left: 8),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
-                        vertical: 2,
+                        vertical: 4,
                       ),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.primary,
@@ -264,26 +478,15 @@ class _EventsScreenState extends State<EventsScreen> {
                     ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                event['title'],
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(
-                    Icons.location_on,
-                    size: 16,
-                    color: Colors.grey.shade700,
-                  ),
+                  Icon(Icons.location_on, size: 16, color: secondaryTextColor),
                   const SizedBox(width: 4),
                   Text(
                     event['location'],
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade700,
+                      color: secondaryTextColor,
                     ),
                   ),
                 ],
@@ -291,16 +494,12 @@ class _EventsScreenState extends State<EventsScreen> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 16,
-                    color: Colors.grey.shade700,
-                  ),
+                  Icon(Icons.access_time, size: 16, color: secondaryTextColor),
                   const SizedBox(width: 4),
                   Text(
-                    '${_formatTime(eventDate)} • ${event['organizer']}',
+                    '${_formatDate(eventDateTime)} ${_formatTime(event['time'])} • ${event['organizer']}',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade700,
+                      color: secondaryTextColor,
                     ),
                   ),
                 ],
@@ -308,28 +507,42 @@ class _EventsScreenState extends State<EventsScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  _buildParticipantIndicator(context, event),
+                  _buildParticipantIndicator(
+                    context,
+                    event,
+                    isPast,
+                    progressBarColor,
+                    progressBackgroundColor,
+                    textColor,
+                  ),
                   const Spacer(),
-                  TextButton.icon(
-                    onPressed: () {
-                      // Logik for tilmelding/afmelding
-                      _toggleParticipation(context, event);
-                    },
-                    icon: Icon(
-                      event['participants'].contains('Alexander Jensen')
-                          ? Icons.check_circle
-                          : Icons.add_circle_outline,
-                      color: theme.colorScheme.primary,
-                    ),
-                    label: Text(
-                      event['participants'].contains('Alexander Jensen')
-                          ? 'Tilmeldt'
-                          : 'Tilmeld',
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
+                  if (!isPast)
+                    ElevatedButton.icon(
+                      onPressed: () => _toggleEventRegistration(event),
+                      icon: Icon(
+                        isUserRegistered
+                            ? Icons.check_circle
+                            : Icons.add_circle_outline,
+                        size: 18,
+                      ),
+                      label: Text(
+                        isUserRegistered ? 'Afmeld' : 'Tilmeld',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isUserRegistered
+                            ? Colors.red
+                            : theme.colorScheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ],
@@ -340,10 +553,24 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 
   Widget _buildParticipantIndicator(
-      BuildContext context, Map<String, dynamic> event) {
+    BuildContext context,
+    Map<String, dynamic> event,
+    bool isPast,
+    Color progressBarColor,
+    Color progressBackgroundColor,
+    Color textColor,
+  ) {
     final theme = Theme.of(context);
-    final int currentParticipants = event['participants'].length;
-    final int maxParticipants = event['maxParticipants'];
+    final int currentParticipants = event['currentParticipants'] ?? 0;
+    final int? maxParticipants = event['maxParticipants'];
+
+    if (maxParticipants == null) {
+      return Text(
+        '$currentParticipants deltagere',
+        style: theme.textTheme.bodySmall?.copyWith(color: textColor),
+      );
+    }
+
     final double percentage = currentParticipants / maxParticipants;
 
     return Row(
@@ -355,7 +582,7 @@ class _EventsScreenState extends State<EventsScreen> {
               width: 100,
               height: 8,
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: progressBackgroundColor,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -363,9 +590,9 @@ class _EventsScreenState extends State<EventsScreen> {
               width: 100 * percentage,
               height: 8,
               decoration: BoxDecoration(
-                color: percentage > 0.8
-                    ? Colors.orange
-                    : theme.colorScheme.primary,
+                color: isPast
+                    ? progressBarColor
+                    : (percentage > 0.8 ? Colors.orange : progressBarColor),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -374,7 +601,7 @@ class _EventsScreenState extends State<EventsScreen> {
         const SizedBox(width: 8),
         Text(
           '$currentParticipants/$maxParticipants',
-          style: theme.textTheme.bodySmall,
+          style: theme.textTheme.bodySmall?.copyWith(color: textColor),
         ),
       ],
     );
@@ -382,6 +609,8 @@ class _EventsScreenState extends State<EventsScreen> {
 
   void _showEventDetails(BuildContext context, Map<String, dynamic> event) {
     final theme = Theme.of(context);
+    final bool isUserRegistered = event['isUserRegistered'] ?? false;
+    final bool isPast = _showPastEvents;
 
     showModalBottomSheet(
       context: context,
@@ -401,7 +630,6 @@ class _EventsScreenState extends State<EventsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle til at lukke modal
               Center(
                 child: Container(
                   width: 40,
@@ -414,39 +642,6 @@ class _EventsScreenState extends State<EventsScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Kategori og dato
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getCategoryColor(event['category']),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      event['category'],
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _formatDate(event['date']),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Titel
               Text(
                 event['title'],
                 style: theme.textTheme.headlineMedium?.copyWith(
@@ -458,13 +653,18 @@ class _EventsScreenState extends State<EventsScreen> {
               // Detaljer
               Row(
                 children: [
-                  Icon(
-                    Icons.location_on,
-                    color: theme.colorScheme.primary,
-                  ),
+                  Icon(Icons.location_on, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(event['location'], style: theme.textTheme.bodyLarge),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.access_time, color: theme.colorScheme.primary),
                   const SizedBox(width: 8),
                   Text(
-                    event['location'],
+                    '${_formatDate(DateTime.parse('${event['date']} ${event['time']}'))} ${_formatTime(event['time'])}',
                     style: theme.textTheme.bodyLarge,
                   ),
                 ],
@@ -472,24 +672,7 @@ class _EventsScreenState extends State<EventsScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(
-                    Icons.access_time,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _formatTime(event['date']),
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    Icons.person,
-                    color: theme.colorScheme.primary,
-                  ),
+                  Icon(Icons.person, color: theme.colorScheme.primary),
                   const SizedBox(width: 8),
                   Text(
                     'Arrangør: ${event['organizer']}',
@@ -500,18 +683,18 @@ class _EventsScreenState extends State<EventsScreen> {
               const SizedBox(height: 20),
 
               // Beskrivelse
-              Text(
-                'Om begivenheden',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+              if (event['description'] != null &&
+                  event['description'].isNotEmpty) ...[
+                Text(
+                  'Om begivenheden',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                event['description'],
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 8),
+                Text(event['description'], style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 20),
+              ],
 
               // Deltagere
               Row(
@@ -524,30 +707,31 @@ class _EventsScreenState extends State<EventsScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '(${event['participants'].length}/${event['maxParticipants']})',
+                    '(${event['currentParticipants']}${event['maxParticipants'] != null ? '/${event['maxParticipants']}' : ''})',
                     style: theme.textTheme.bodyMedium,
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              if (event['participants'].isNotEmpty)
-                SizedBox(
-                  height: 40,
+              if (event['participants'] != null &&
+                  (event['participants'] as List).isNotEmpty)
+                Expanded(
                   child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: event['participants'].length,
+                    itemCount: (event['participants'] as List).length,
                     itemBuilder: (context, index) {
+                      final participant =
+                          (event['participants'] as List)[index];
                       return Container(
-                        margin: const EdgeInsets.only(right: 8),
+                        margin: const EdgeInsets.only(bottom: 4),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text(event['participants'][index]),
+                        child: Text(participant),
                       );
                     },
                   ),
@@ -559,35 +743,34 @@ class _EventsScreenState extends State<EventsScreen> {
                     color: Colors.grey.shade600,
                   ),
                 ),
-              const Spacer(),
+              const SizedBox(height: 16),
 
               // Tilmeldingsknap
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Logik for tilmelding/afmelding
-                    _toggleParticipation(context, event);
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: event['participants']
-                            .contains('Alexander Jensen')
-                        ? Colors.red
-                        : theme.colorScheme.primary,
-                  ),
-                  child: Text(
-                    event['participants'].contains('Alexander Jensen')
-                        ? 'Afmeld begivenhed'
-                        : 'Tilmeld begivenhed',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+              if (!isPast)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _toggleEventRegistration(event);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: isUserRegistered
+                          ? Colors.red
+                          : theme.colorScheme.primary,
+                    ),
+                    child: Text(
+                      isUserRegistered
+                          ? 'Afmeld begivenhed'
+                          : 'Tilmeld begivenhed',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -595,41 +778,11 @@ class _EventsScreenState extends State<EventsScreen> {
     );
   }
 
-  void _toggleParticipation(
-      BuildContext context, Map<String, dynamic> event) {
-    setState(() {
-      if (event['participants'].contains('Alexander Jensen')) {
-        event['participants'].remove('Alexander Jensen');
-      } else {
-        // Tjek om der er plads
-        if (event['participants'].length < event['maxParticipants']) {
-          event['participants'].add('Alexander Jensen');
-        } else {
-          // Vis en besked om at begivenheden er fuld
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Begivenheden er allerede fuld'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    });
-  }
-
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'Mad':
-        return Colors.green;
-      case 'Underholdning':
-        return Colors.purple;
-      case 'Møde':
-        return Colors.blue;
-      case 'Praktisk':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.day == now.day &&
+        date.month == now.month &&
+        date.year == now.year;
   }
 
   String _formatDate(DateTime date) {
@@ -660,15 +813,23 @@ class _EventsScreenState extends State<EventsScreen> {
       'september',
       'oktober',
       'november',
-      'december'
+      'december',
     ];
 
     return '${date.day}. ${months[date.month - 1]}';
   }
 
-  String _formatTime(DateTime date) {
-    final hour = date.hour.toString().padLeft(2, '0');
-    final minute = date.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
+  String _formatTime(String timeString) {
+    try {
+      final parts = timeString.split(':');
+      if (parts.length >= 2) {
+        final hour = parts[0].padLeft(2, '0');
+        final minute = parts[1].padLeft(2, '0');
+        return '$hour:$minute';
+      }
+      return timeString;
+    } catch (e) {
+      return timeString;
+    }
   }
 }

@@ -1,11 +1,61 @@
 import 'package:flutter/material.dart';
 import '../utils/constants.dart';
+import '../services/user_service.dart';
 
-class NavigationMenu extends StatelessWidget {
+class NavigationMenu extends StatefulWidget {
   final String currentRoute;
 
   const NavigationMenu({Key? key, required this.currentRoute})
     : super(key: key);
+
+  @override
+  State<NavigationMenu> createState() => _NavigationMenuState();
+}
+
+class _NavigationMenuState extends State<NavigationMenu> {
+  String _userName = '';
+  String _userEmail = '';
+  String _userInitials = '';
+  String? _profileImageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final userData = await UserService.getUserData();
+      final initials = await UserService.getUserInitials();
+      final profileImageUrl = await UserService.getProfileImageUrl();
+
+      if (mounted) {
+        setState(() {
+          _userName =
+              '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
+                  .trim();
+          _userEmail = userData['email'] ?? '';
+          _userInitials = initials;
+          _profileImageUrl = profileImageUrl;
+
+          // Fallback hvis data mangler
+          if (_userName.isEmpty) _userName = 'Bruger';
+          if (_userEmail.isEmpty) _userEmail = 'Ingen email';
+        });
+      }
+    } catch (e) {
+      print('Fejl ved indlæsning af brugerdata i navigation: $e');
+      if (mounted) {
+        setState(() {
+          _userName = 'Bruger';
+          _userEmail = 'Ingen email';
+          _userInitials = 'U';
+          _profileImageUrl = null;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +65,7 @@ class NavigationMenu extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            height: 200, // Øget højde
+            height: 200,
             decoration: BoxDecoration(
               color: theme.colorScheme.primary,
               borderRadius: const BorderRadius.only(
@@ -31,47 +81,47 @@ class NavigationMenu extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      // Cirkel med brugerinitialer i stedet for logo
                       CircleAvatar(
                         radius: 40,
                         backgroundColor: Colors.white,
-                        child: Text(
-                          'AJ', // Initialer for Alexander Jensen
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
+                        backgroundImage: _profileImageUrl != null
+                            ? NetworkImage(_profileImageUrl!)
+                            : null,
+                        child: _profileImageUrl == null
+                            ? Text(
+                                _userInitials,
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              )
+                            : null,
                       ),
                       const SizedBox(width: 16),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Kollegie App',
-                              style: TextStyle(
+                              _userName,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 18,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
-                              'Alexander Jensen',
-                              style: TextStyle(
+                              _userEmail,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
                               ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'alexander@example.com',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -108,36 +158,43 @@ class NavigationMenu extends StatelessWidget {
                   icon: AppIcons.home,
                   title: AppText.homeTitle,
                   route: homeRoute,
-                  isActive: currentRoute == homeRoute,
+                  isActive: widget.currentRoute == homeRoute,
                 ),
                 _buildNavItem(
                   context: context,
                   icon: AppIcons.food,
                   title: AppText.foodTitle,
                   route: foodRoute,
-                  isActive: currentRoute == foodRoute,
+                  isActive: widget.currentRoute == foodRoute,
                 ),
                 _buildNavItem(
                   context: context,
                   icon: AppIcons.events,
                   title: AppText.eventsTitle,
                   route: eventsRoute,
-                  isActive: currentRoute == eventsRoute,
+                  isActive: widget.currentRoute == eventsRoute,
                 ),
                 _buildNavItem(
                   context: context,
                   icon: AppIcons.news,
                   title: AppText.newsTitle,
                   route: newsRoute,
-                  isActive: currentRoute == newsRoute,
+                  isActive: widget.currentRoute == newsRoute,
                 ),
                 _buildNavItem(
-  context: context,
-  icon: AppIcons.contacts,
-  title: AppText.contactsTitle,
-  route: contactsRoute,
-  isActive: currentRoute == contactsRoute,
-),
+                  context: context,
+                  icon: AppIcons.messages,
+                  title: AppText.messagesTitle,
+                  route: messagesRoute,
+                  isActive: widget.currentRoute == messagesRoute,
+                ),
+                _buildNavItem(
+                  context: context,
+                  icon: AppIcons.contacts,
+                  title: AppText.contactsTitle,
+                  route: contactsRoute,
+                  isActive: widget.currentRoute == contactsRoute,
+                ),
 
                 // Divider for at separere navigation og personlige indstillinger
                 const Padding(
@@ -169,14 +226,14 @@ class NavigationMenu extends StatelessWidget {
                   icon: AppIcons.profile,
                   title: AppText.profileTitle,
                   route: profileRoute,
-                  isActive: currentRoute == profileRoute,
+                  isActive: widget.currentRoute == profileRoute,
                 ),
                 _buildNavItem(
                   context: context,
                   icon: AppIcons.settings,
                   title: AppText.settingsTitle,
                   route: settingsRoute,
-                  isActive: currentRoute == settingsRoute,
+                  isActive: widget.currentRoute == settingsRoute,
                 ),
               ],
             ),

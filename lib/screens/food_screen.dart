@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/constants.dart';
 import '../utils/theme.dart';
 import '../widgets/navigation_menu.dart';
+import '../services/foodplan_service.dart';
 
 class FoodScreen extends StatefulWidget {
   const FoodScreen({Key? key}) : super(key: key);
@@ -12,81 +13,117 @@ class FoodScreen extends StatefulWidget {
 
 class _FoodScreenState extends State<FoodScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _selectedWeek = 18; // Nuværende uge (uge 18)
 
-  // Alle madplaner
-  final Map<int, List<Map<String, dynamic>>> _allMealPlans = {
-    // Uge 18 madplan
-    18: [
-      {
-        'dag': 'Mandag',
-        'ret': 'Pasta Carbonara',
-        'beskrivelse': 'Klassisk italiensk ret med bacon, aeg og parmesan',
-        'tid': '18:00',
-        'allergener': ['Gluten', 'Laktose', 'Aeg'],
-      },
-      {
-        'dag': 'Tirsdag',
-        'ret': 'Taco Tuesday',
-        'beskrivelse':
-            'Byg-selv tacos med oksekod, grontsager og diverse tilbehor',
-        'tid': '18:30',
-        'allergener': ['Gluten', 'Laktose'],
-      },
-      {
-        'dag': 'Onsdag',
-        'ret': 'Vegetarisk Buddha Bowl',
-        'beskrivelse':
-            'Sund skal med quinoa, avocado, grontsager og tahin-dressing',
-        'tid': '18:00',
-        'allergener': ['Nødder', 'Sesam'],
-        'vegetar': true,
-      },
-      {
-        'dag': 'Torsdag',
-        'ret': 'Kylling i karry',
-        'beskrivelse': 'Cremet karryret med ris og naanbrod',
-        'tid': '18:15',
-        'allergener': ['Laktose'],
-      },
-    ],
-    // Uge 19 madplan
-    19: [
-      {
-        'dag': 'Mandag',
-        'ret': 'Lasagne',
-        'beskrivelse': 'Hjemmelavet lasagne med oksekød og bechamelsauce',
-        'tid': '18:00',
-        'allergener': ['Gluten', 'Laktose'],
-      },
-      {
-        'dag': 'Tirsdag',
-        'ret': 'Fiskefrikadeller',
-        'beskrivelse': 'Fiskefrikadeller med kartofler og remoulade',
-        'tid': '18:00',
-        'allergener': ['Fisk', 'Aeg'],
-      },
-      {
-        'dag': 'Onsdag',
-        'ret': 'Pizza aften',
-        'beskrivelse': 'Vi laver pizzaer sammen med forskellige toppings',
-        'tid': '18:30',
-        'allergener': ['Gluten', 'Laktose'],
-      },
-      {
-        'dag': 'Torsdag',
-        'ret': 'Falafler med couscous',
-        'beskrivelse': 'Vegetariske falafler med couscous og tzatziki',
-        'tid': '18:15',
-        'allergener': ['Gluten', 'Laktose'],
-        'vegetar': true,
-      },
-    ],
-  };
+  // Nuværende uge og år
+  late int _currentWeek;
+  late int _currentYear;
+  int _selectedWeek = 0;
+  int _selectedYear = 0;
 
-  // Hent den valgte madplan
-  List<Map<String, dynamic>> get _currentMealPlan => 
-      _allMealPlans[_selectedWeek] ?? [];
+  // Data state
+  List<Map<String, dynamic>> _currentMealPlan = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeWeek();
+    _loadFoodplan();
+  }
+
+  void _initializeWeek() {
+    final now = DateTime.now();
+    _currentWeek = FoodplanService.getSimpleWeekNumber(now);
+    _currentYear = now.year;
+    _selectedWeek = _currentWeek;
+    _selectedYear = _currentYear;
+  }
+
+  Future<void> _loadFoodplan() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await FoodplanService.getFoodplan(
+        week: _selectedWeek,
+        year: _selectedYear,
+      );
+
+      if (response['success'] == true) {
+        final data = response['data'];
+        if (data != null) {
+          setState(() {
+            _currentMealPlan = List<Map<String, dynamic>>.from(
+              data['meals'] ?? [],
+            );
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _currentMealPlan = [];
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _errorMessage =
+              response['message'] ?? 'Fejl ved indlæsning af madplan';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Netværksfejl: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _changeWeek(int delta) {
+    int newWeek = _selectedWeek + delta;
+    int newYear = _selectedYear;
+
+    if (newWeek < 1) {
+      newWeek = 52;
+      newYear--;
+    } else if (newWeek > 52) {
+      newWeek = 1;
+      newYear++;
+    }
+
+    // Begræns år til fornuftige værdier
+    if (newYear < 2020) {
+      newYear = 2020;
+      newWeek = 1;
+    } else if (newYear > 2030) {
+      newYear = 2030;
+      newWeek = 52;
+    }
+
+    setState(() {
+      _selectedWeek = newWeek;
+      _selectedYear = newYear;
+    });
+
+    _loadFoodplan();
+  }
+
+  String _getTodayDanish() {
+    final weekday = DateTime.now().weekday;
+    const days = [
+      'Mandag',
+      'Tirsdag',
+      'Onsdag',
+      'Torsdag',
+      'Fredag',
+      'Lørdag',
+      'Søndag',
+    ];
+    return weekday <= days.length ? days[weekday - 1] : '';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +146,7 @@ class _FoodScreenState extends State<FoodScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadFoodplan),
           IconButton(
             icon: const Icon(Icons.menu),
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
@@ -116,14 +154,52 @@ class _FoodScreenState extends State<FoodScreen> {
         ],
       ),
       endDrawer: const NavigationMenu(currentRoute: foodRoute),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Uge selector og titel
-              Row(
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Uge selector og titel
+            _buildWeekSelector(),
+            const SizedBox(height: 24),
+
+            // Loading, error eller indhold
+            if (_isLoading)
+              _buildLoadingState()
+            else if (_errorMessage != null)
+              _buildErrorState()
+            else if (_currentMealPlan.isEmpty)
+              _buildEmptyState()
+            else
+              _buildMealPlanContent(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeekSelector() {
+    final theme = Theme.of(context);
+    final isCurrentWeek =
+        _selectedWeek == _currentWeek && _selectedYear == _currentYear;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: theme.colorScheme.primary.withOpacity(0.1),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Madplan for uge $_selectedWeek',
@@ -131,73 +207,136 @@ class _FoodScreenState extends State<FoodScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const Spacer(),
-                  // Tilføjer knapper til at skifte uge
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
-                    onPressed: () {
-                      setState(() {
-                        _selectedWeek = _selectedWeek > 1 ? _selectedWeek - 1 : 52;
-                      });
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: () {
-                      setState(() {
-                        _selectedWeek = _selectedWeek < 52 ? _selectedWeek + 1 : 1;
-                      });
-                    },
-                  ),
+                  const SizedBox(height: 4),
+                  if (isCurrentWeek)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Nuværende uge',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // Viser "ingen madplan" besked hvis der ikke er data for den valgte uge
-              if (_currentMealPlan.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.restaurant_menu,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Ingen madplan for uge $_selectedWeek',
-                          style: theme.textTheme.titleMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Prøv en anden uge eller kontakt administrationen',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey.shade600,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
+            ),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () => _changeWeek(-1),
                 ),
-
-              // Madplankort for hver dag
-              ..._currentMealPlan
-                  .map(
-                    (mad) => _buildMealCard(
-                      context,
-                      mad,
-                      isToday: mad['dag'] == 'Tirsdag', // Markerer tirsdag som "I DAG" for eksemplets skyld
-                    ),
-                  )
-                  .toList(),
-            ],
-          ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () => _changeWeek(1),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48.0),
+        child: Column(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Indlæser madplan...',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+            const SizedBox(height: 16),
+            Text('Der opstod en fejl', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadFoodplan,
+              child: const Text('Prøv igen'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          children: [
+            Icon(Icons.restaurant_menu, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Ingen madplan for uge $_selectedWeek',
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Prøv en anden uge eller kontakt administrationen',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMealPlanContent() {
+    final todayDanish = _getTodayDanish();
+
+    return Column(
+      children: _currentMealPlan.map((meal) {
+        final isToday =
+            meal['dag'] == todayDanish &&
+            _selectedWeek == _currentWeek &&
+            _selectedYear == _currentYear;
+        return _buildMealCard(context, meal, isToday: isToday);
+      }).toList(),
     );
   }
 
@@ -312,7 +451,8 @@ class _FoodScreenState extends State<FoodScreen> {
             const SizedBox(height: 8),
 
             // Beskrivelse
-            Text(mad['beskrivelse'], style: theme.textTheme.bodyMedium),
+            if (mad['beskrivelse'] != null && mad['beskrivelse'].isNotEmpty)
+              Text(mad['beskrivelse'], style: theme.textTheme.bodyMedium),
 
             const SizedBox(height: 16),
 
