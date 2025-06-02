@@ -23,9 +23,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String _currentUserType = '';
   String? _profileImageUrl;
 
-  // Madplan data
-  List<Map<String, dynamic>> _weekMeals = [];
+  // Madplan data - følger samme mønster som food_screen.dart
+  List<Map<String, dynamic>> _currentMealPlan = [];
   bool _loadingMeals = true;
+  String? _mealError;
 
   // Events data
   List<Map<String, dynamic>> _upcomingEvents = [];
@@ -89,27 +90,47 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadWeekMeals() async {
     setState(() {
       _loadingMeals = true;
+      _mealError = null;
     });
 
     try {
-      final response = await FoodplanService.getCurrentWeekFoodplan();
+      // Følger samme mønster som food_screen.dart
+      final now = DateTime.now();
+      final currentWeek = FoodplanService.getSimpleWeekNumber(now);
+      final currentYear = now.year;
 
-      if (response['success'] == true && response['data'] != null) {
-        final meals = response['data']['meals'] as List<dynamic>? ?? [];
-        setState(() {
-          _weekMeals = List<Map<String, dynamic>>.from(meals);
-          _loadingMeals = false;
-        });
+      final response = await FoodplanService.getFoodplan(
+        week: currentWeek,
+        year: currentYear,
+      );
+
+      print('Madplan response: $response');
+
+      if (response['success'] == true) {
+        final data = response['data'];
+        if (data != null) {
+          setState(() {
+            _currentMealPlan = List<Map<String, dynamic>>.from(
+              data['meals'] ?? [],
+            );
+            _loadingMeals = false;
+          });
+          print('Loaded ${_currentMealPlan.length} meals: $_currentMealPlan');
+        } else {
+          setState(() {
+            _currentMealPlan = [];
+            _loadingMeals = false;
+          });
+        }
       } else {
         setState(() {
-          _weekMeals = [];
+          _mealError = response['message'] ?? 'Fejl ved indlæsning af madplan';
           _loadingMeals = false;
         });
       }
     } catch (e) {
-      print('Fejl ved indlæsning af madplan: $e');
       setState(() {
-        _weekMeals = [];
+        _mealError = 'Netværksfejl: $e';
         _loadingMeals = false;
       });
     }
@@ -275,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _getTodayMeal() {
-    if (_weekMeals.isEmpty) return 'Ingen ret i dag';
+    if (_currentMealPlan.isEmpty) return 'Ingen ret i dag';
 
     final today = DateTime.now().weekday;
     const dayNames = [
@@ -291,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (today <= dayNames.length) {
       final todayName = dayNames[today - 1];
 
-      for (final meal in _weekMeals) {
+      for (final meal in _currentMealPlan) {
         if (meal['dag'] == todayName) {
           return meal['ret'] ?? 'Ingen ret';
         }
@@ -302,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Map<String, dynamic>> _getUpcomingMeals() {
-    if (_weekMeals.isEmpty) return [];
+    if (_currentMealPlan.isEmpty) return [];
 
     final today = DateTime.now().weekday;
     const dayNames = [
@@ -317,12 +338,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     List<Map<String, dynamic>> upcomingMeals = [];
 
+    // Start med i dag og de næste 2 dage
     for (int i = 0; i < 3; i++) {
       final dayIndex = (today - 1 + i) % 7;
       if (dayIndex < dayNames.length) {
         final dayName = dayNames[dayIndex];
 
-        for (final meal in _weekMeals) {
+        for (final meal in _currentMealPlan) {
           if (meal['dag'] == dayName) {
             String displayDay;
             if (i == 0) {
@@ -336,6 +358,20 @@ class _HomeScreenState extends State<HomeScreen> {
             upcomingMeals.add({...meal, 'displayDay': displayDay});
             break;
           }
+        }
+      }
+    }
+
+    // Hvis vi ikke har nok måltider, tilføj resten
+    if (upcomingMeals.length < 2 && _currentMealPlan.isNotEmpty) {
+      for (final meal in _currentMealPlan) {
+        if (upcomingMeals.length >= 3) break;
+
+        bool alreadyAdded = upcomingMeals.any(
+          (existing) => existing['dag'] == meal['dag'],
+        );
+        if (!alreadyAdded) {
+          upcomingMeals.add({...meal, 'displayDay': meal['dag']});
         }
       }
     }
@@ -568,18 +604,68 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (_weekMeals.isEmpty) {
+    if (_mealError != null) {
       return SizedBox(
         height: 160,
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.restaurant_menu, color: Colors.grey.shade400),
+              Icon(Icons.error_outline, color: Colors.red.shade400, size: 40),
+              const SizedBox(height: 8),
+              Text(
+                'Fejl ved indlæsning',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _mealError!,
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _loadWeekMeals,
+                child: const Text('Prøv igen'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_currentMealPlan.isEmpty) {
+      return SizedBox(
+        height: 160,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.restaurant_menu,
+                color: Colors.grey.shade400,
+                size: 40,
+              ),
               const SizedBox(height: 8),
               Text(
                 'Ingen madplan denne uge',
-                style: TextStyle(color: Colors.grey.shade600),
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Der er endnu ikke oprettet en madplan',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, foodRoute),
+                child: const Text('Se madplan'),
               ),
             ],
           ),
@@ -590,6 +676,42 @@ class _HomeScreenState extends State<HomeScreen> {
     final upcomingMeals = _getUpcomingMeals();
     final theme = Theme.of(context);
 
+    print('Current meal plan: $_currentMealPlan');
+    print('Upcoming meals: $upcomingMeals');
+
+    if (upcomingMeals.isEmpty) {
+      return SizedBox(
+        height: 160,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.restaurant_menu,
+                color: Colors.grey.shade400,
+                size: 40,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Ingen kommende måltider',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Debug: ${_currentMealPlan.length} måltider i alt',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, foodRoute),
+                child: const Text('Se madplan'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       height: 160,
       child: ListView.builder(
@@ -599,9 +721,9 @@ class _HomeScreenState extends State<HomeScreen> {
           final meal = upcomingMeals[index];
           return _buildHorizontalMealCard(
             context,
-            meal['displayDay'] ?? meal['dag'],
+            meal['displayDay'] ?? meal['dag'] ?? 'Ukendt dag',
             meal['ret'] ?? 'Ingen ret',
-            'Serveres kl. ${meal['tid'] ?? '18:00'}',
+            meal['beskrivelse'] ?? 'Ingen beskrivelse tilgængelig',
             Icons.restaurant,
             theme.colorScheme.primary,
             onTap: () => Navigator.pushNamed(context, foodRoute),
@@ -820,7 +942,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const Spacer(),
                 const Text(
-                  'Dagens middag',
+                  'Dagens ret',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -941,6 +1063,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 details,
                 style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

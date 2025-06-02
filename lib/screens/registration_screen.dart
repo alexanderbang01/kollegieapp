@@ -84,8 +84,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           SuccessNotification.show(
             context,
             title: 'Velkommen ${userData['first_name']}!',
-            message:
-                'Du er nu registreret på Mercantec Kollegium (ID: $userId)',
+            message: 'Du er nu registreret på Mercantec Kollegium',
             icon: Icons.home,
             color: Colors.green,
             duration: const Duration(seconds: 4),
