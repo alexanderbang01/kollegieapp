@@ -5,6 +5,7 @@ import '../services/user_service.dart';
 import '../services/foodplan_service.dart';
 import '../services/events_service.dart';
 import '../services/news_service.dart';
+import '../services/notifications_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -13,8 +14,16 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GlobalKey _notificationKey = GlobalKey();
+
+  // Animation controllers
+  late AnimationController _notificationAnimationController;
+  late Animation<double> _notificationSlideAnimation;
+  late Animation<double> _notificationFadeAnimation;
+  bool _showNotificationDropdown = false;
+  OverlayEntry? _notificationOverlay;
 
   // User data
   String _userName = '';
@@ -36,10 +45,41 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _latestNews = [];
   bool _loadingNews = true;
 
+  // Notifications data
+  List<Map<String, dynamic>> _notifications = [];
+  bool _loadingNotifications = true;
+  int _unreadNotificationCount = 0;
+
   @override
   void initState() {
     super.initState();
+    _notificationAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _notificationSlideAnimation = Tween<double>(begin: -1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _notificationAnimationController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    _notificationFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _notificationAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
     _initializeData();
+  }
+
+  @override
+  void dispose() {
+    _notificationAnimationController.dispose();
+    _hideNotificationDropdown();
+    super.dispose();
   }
 
   Future<void> _initializeData() async {
@@ -47,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadWeekMeals();
     await _loadUpcomingEvents();
     await _loadLatestNews();
+    await _loadNotifications();
   }
 
   Future<void> _refreshData() async {
@@ -55,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadWeekMeals(),
       _loadUpcomingEvents(),
       _loadLatestNews(),
+      _loadNotifications(),
     ]);
   }
 
@@ -217,6 +259,413 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadNotifications() async {
+    setState(() {
+      _loadingNotifications = true;
+    });
+
+    if (_currentUserId.isEmpty) {
+      setState(() {
+        _notifications = [];
+        _unreadNotificationCount = 0;
+        _loadingNotifications = false;
+      });
+      return;
+    }
+
+    try {
+      // Hent notifikationer
+      final response = await NotificationsService.getNotifications(
+        userId: _currentUserId,
+        limit: 10, // Flere notifikationer til dropdown
+      );
+
+      // Hent antal ulæste
+      final unreadResponse = await NotificationsService.getUnreadCount(
+        userId: _currentUserId,
+      );
+
+      if (response['success'] == true && response['data'] != null) {
+        final notifications = response['data'] as List<dynamic>? ?? [];
+        setState(() {
+          _notifications = List<Map<String, dynamic>>.from(notifications);
+          _unreadNotificationCount =
+              unreadResponse['data']?['unread_count'] ?? 0;
+          _loadingNotifications = false;
+        });
+      } else {
+        setState(() {
+          _notifications = [];
+          _unreadNotificationCount = 0;
+          _loadingNotifications = false;
+        });
+      }
+    } catch (e) {
+      print('Fejl ved indlæsning af notifikationer: $e');
+      setState(() {
+        _notifications = [];
+        _unreadNotificationCount = 0;
+        _loadingNotifications = false;
+      });
+    }
+  }
+
+  Future<void> _markNotificationAsRead(int notificationId) async {
+    try {
+      await NotificationsService.markAsRead(
+        userId: _currentUserId,
+        notificationId: notificationId,
+      );
+
+      // Opdater lokalt
+      setState(() {
+        final index = _notifications.indexWhere(
+          (n) => n['id'] == notificationId,
+        );
+        if (index != -1) {
+          _notifications[index]['is_read'] = true;
+          if (_unreadNotificationCount > 0) {
+            _unreadNotificationCount--;
+          }
+        }
+      });
+    } catch (e) {
+      print('Fejl ved markering som læst: $e');
+    }
+  }
+
+  Future<void> _markAllNotificationsAsRead() async {
+    try {
+      await NotificationsService.markAllAsRead(userId: _currentUserId);
+
+      setState(() {
+        for (int i = 0; i < _notifications.length; i++) {
+          _notifications[i]['is_read'] = true;
+        }
+        _unreadNotificationCount = 0;
+      });
+    } catch (e) {
+      print('Fejl ved markering af alle som læst: $e');
+    }
+  }
+
+  void _toggleNotificationDropdown() {
+    if (_showNotificationDropdown) {
+      _hideNotificationDropdown();
+    } else {
+      _showNotificationDropdownMethod();
+    }
+  }
+
+  void _showNotificationDropdownMethod() {
+    if (_showNotificationDropdown) return;
+
+    // Sikr at animation controller er initialiseret
+    if (!_notificationAnimationController.isCompleted &&
+        !_notificationAnimationController.isAnimating) {
+      _notificationAnimationController.reset();
+    }
+
+    setState(() {
+      _showNotificationDropdown = true;
+    });
+
+    // Tjek om context og key stadig eksisterer
+    if (!mounted || _notificationKey.currentContext == null) return;
+
+    final RenderBox? renderBox =
+        _notificationKey.currentContext!.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final position = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    _notificationOverlay = OverlayEntry(
+      builder: (context) => GestureDetector(
+        onTap: _hideNotificationDropdown,
+        child: Container(
+          color: Colors.transparent,
+          child: Stack(
+            children: [
+              Positioned(
+                top: position.dy + size.height + 8,
+                right: 8, // Justeret fra 16 til 8 for bedre margin
+                width:
+                    screenWidth -
+                    16, // Begrænset bredde til skærmbredde minus margen
+                child: AnimatedBuilder(
+                  animation: _notificationAnimationController,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(0, _notificationSlideAnimation.value * 50),
+                      child: Opacity(
+                        opacity: _notificationFadeAnimation.value,
+                        child: _buildNotificationDropdown(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(_notificationOverlay!);
+    _notificationAnimationController.forward();
+  }
+
+  void _hideNotificationDropdown() {
+    if (!_showNotificationDropdown) return;
+
+    _notificationAnimationController.reverse().then((_) {
+      _notificationOverlay?.remove();
+      _notificationOverlay = null;
+      if (mounted) {
+        setState(() {
+          _showNotificationDropdown = false;
+        });
+      }
+    });
+  }
+
+  Widget _buildNotificationDropdown() {
+    final theme = Theme.of(context);
+
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 350, // Øget bredde
+        constraints: const BoxConstraints(maxHeight: 450, minHeight: 200),
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    // Tilføjet Expanded her
+                    child: Text(
+                      'Notifikationer',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  if (_unreadNotificationCount > 0) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$_unreadNotificationCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      // Ændret fra ingen wrapper til Flexible
+                      child: TextButton(
+                        onPressed: _markAllNotificationsAsRead,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Marker alle',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Notifications list
+            if (_loadingNotifications)
+              const Padding(
+                padding: EdgeInsets.all(32.0),
+                child: CircularProgressIndicator(),
+              )
+            else if (_notifications.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.notifications_none,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Ingen notifikationer',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: _notifications.length,
+                  separatorBuilder: (context, index) =>
+                      Divider(height: 1, color: Colors.grey.shade200),
+                  itemBuilder: (context, index) {
+                    final notification = _notifications[index];
+                    return _buildDropdownNotificationItem(notification);
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownNotificationItem(Map<String, dynamic> notification) {
+    final theme = Theme.of(context);
+    final isRead = notification['is_read'] == true;
+    final type = notification['type'] as String;
+
+    IconData icon;
+    Color iconColor;
+
+    switch (type) {
+      case 'event':
+        icon = Icons.event;
+        iconColor = Colors.blue;
+        break;
+      case 'news':
+        icon = Icons.newspaper;
+        iconColor = Colors.green;
+        break;
+      case 'message':
+        icon = Icons.message;
+        iconColor = Colors.orange;
+        break;
+      default:
+        icon = Icons.notifications;
+        iconColor = theme.colorScheme.primary;
+    }
+
+    return InkWell(
+      onTap: () => _onNotificationTap(notification),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        color: isRead ? null : theme.colorScheme.primary.withOpacity(0.03),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          notification['title'] ?? '',
+                          style: TextStyle(
+                            fontWeight: isRead
+                                ? FontWeight.w500
+                                : FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          maxLines: 2, // Tilføjet maxLines
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (!isRead) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    notification['content'] ?? '',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    maxLines: 3, // Øget fra 2 til 3
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _formatNotificationDate(notification['created_at']),
+                    style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _toggleEventRegistration(Map<String, dynamic> event) async {
     final eventId = event['id'] as int;
     final isRegistered = event['isUserRegistered'] as bool;
@@ -293,6 +742,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Naviger til news screen
     Navigator.pushNamed(context, newsRoute);
+  }
+
+  void _onNotificationTap(Map<String, dynamic> notification) async {
+    final notificationId = notification['id'] as int;
+    final type = notification['type'] as String;
+    final relatedId = notification['related_id'];
+
+    // Skjul dropdown først
+    _hideNotificationDropdown();
+
+    // Marker som læst hvis ikke allerede læst
+    if (notification['is_read'] != true) {
+      await _markNotificationAsRead(notificationId);
+    }
+
+    // Naviger baseret på type
+    switch (type) {
+      case 'event':
+        Navigator.pushNamed(context, eventsRoute);
+        break;
+      case 'news':
+        Navigator.pushNamed(context, newsRoute);
+        break;
+      case 'message':
+        Navigator.pushNamed(context, messagesRoute);
+        break;
+    }
   }
 
   String _getTodayMeal() {
@@ -379,6 +855,104 @@ class _HomeScreenState extends State<HomeScreen> {
     return upcomingMeals;
   }
 
+  String _formatNewsDate(String? dateString) {
+    if (dateString == null) return '';
+
+    try {
+      final date = DateTime.parse(dateString);
+
+      // Danske månedsnavne
+      final months = [
+        'januar',
+        'februar',
+        'marts',
+        'april',
+        'maj',
+        'juni',
+        'juli',
+        'august',
+        'september',
+        'oktober',
+        'november',
+        'december',
+      ];
+
+      return '${date.day}. ${months[date.month - 1]}';
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  String _formatNotificationDate(String? dateString) {
+    if (dateString == null) return '';
+
+    try {
+      final date = DateTime.parse(dateString);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inMinutes < 1) {
+        return 'Nu';
+      } else if (difference.inHours < 1) {
+        return '${difference.inMinutes}m siden';
+      } else if (difference.inDays < 1) {
+        return '${difference.inHours}t siden';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays}d siden';
+      } else {
+        final months = [
+          'jan',
+          'feb',
+          'mar',
+          'apr',
+          'maj',
+          'jun',
+          'jul',
+          'aug',
+          'sep',
+          'okt',
+          'nov',
+          'dec',
+        ];
+        return '${date.day}. ${months[date.month - 1]}';
+      }
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  // Hjælpefunktioner til datoformatering uden brug af intl
+  String _getDayName(int weekday) {
+    const days = [
+      'Mandag',
+      'Tirsdag',
+      'Onsdag',
+      'Torsdag',
+      'Fredag',
+      'Lørdag',
+      'Søndag',
+    ];
+    return days[weekday - 1];
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'januar',
+      'februar',
+      'marts',
+      'april',
+      'maj',
+      'juni',
+      'juli',
+      'august',
+      'september',
+      'oktober',
+      'november',
+      'december',
+    ];
+    return months[month - 1];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -449,6 +1023,50 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 actions: [
+                  // Notification icon with badge
+                  Container(
+                    key: _notificationKey,
+                    child: IconButton(
+                      icon: Stack(
+                        children: [
+                          Icon(
+                            Icons.notifications_outlined,
+                            color: theme.colorScheme.primary,
+                            size: 28,
+                          ),
+                          if (_unreadNotificationCount > 0)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 16,
+                                  minHeight: 16,
+                                ),
+                                child: Text(
+                                  _unreadNotificationCount > 99
+                                      ? '99+'
+                                      : _unreadNotificationCount.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      onPressed: _toggleNotificationDropdown,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: Icon(
                       Icons.menu,
@@ -794,66 +1412,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _formatNewsDate(String? dateString) {
-    if (dateString == null) return '';
-
-    try {
-      final date = DateTime.parse(dateString);
-
-      // Danske månedsnavne
-      final months = [
-        'januar',
-        'februar',
-        'marts',
-        'april',
-        'maj',
-        'juni',
-        'juli',
-        'august',
-        'september',
-        'oktober',
-        'november',
-        'december',
-      ];
-
-      return '${date.day}. ${months[date.month - 1]}';
-    } catch (e) {
-      return dateString;
-    }
-  }
-
-  // Hjælpefunktioner til datoformatering uden brug af intl
-  String _getDayName(int weekday) {
-    const days = [
-      'Mandag',
-      'Tirsdag',
-      'Onsdag',
-      'Torsdag',
-      'Fredag',
-      'Lørdag',
-      'Søndag',
-    ];
-    return days[weekday - 1];
-  }
-
-  String _getMonthName(int month) {
-    const months = [
-      'januar',
-      'februar',
-      'marts',
-      'april',
-      'maj',
-      'juni',
-      'juli',
-      'august',
-      'september',
-      'oktober',
-      'november',
-      'december',
-    ];
-    return months[month - 1];
-  }
-
   Widget _buildDaySummaryCard(BuildContext context, Size size) {
     final theme = Theme.of(context);
     final todayMeal = _getTodayMeal();
@@ -926,18 +1484,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.notifications_none,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
+                    // FJERNET: det røde badge - kun notifikations-ikonet i app bar nu
                   ],
                 ),
                 const Spacer(),

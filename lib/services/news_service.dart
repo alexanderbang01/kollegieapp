@@ -56,4 +56,44 @@ class NewsService {
       body: {'news_id': newsId},
     );
   }
+
+  // Hent alle nyheder uden pagination (for admin)
+  static Future<Map<String, dynamic>> getAllNews({String? userId}) async {
+    return await ApiService.get(
+      endpoint: '/news/get_news.php',
+      queryParams: {'user_id': userId ?? '1', 'all': 'true'},
+    );
+  }
+
+  // Hent en specifik nyhed
+  static Future<Map<String, dynamic>> getNewsById({
+    required String userId,
+    required int newsId,
+  }) async {
+    return await ApiService.get(
+      endpoint: '/news/get_news.php',
+      queryParams: {'user_id': userId, 'news_id': newsId.toString()},
+    );
+  }
+
+  // Hent antal ulæste nyheder
+  static Future<Map<String, dynamic>> getUnreadNewsCount({
+    required String userId,
+  }) async {
+    return await ApiService.get(
+      endpoint: '/news/get_news.php',
+      queryParams: {'user_id': userId, 'unread_count': 'true'},
+    );
+  }
+
+  // Marker alle nyheder som læst
+  static Future<Map<String, dynamic>> markAllNewsAsRead({
+    required String userId,
+  }) async {
+    return await ApiService.post(
+      endpoint: '/news/mark_as_read.php',
+      authorization: '$userId:resident',
+      body: {'mark_all': true},
+    );
+  }
 }
