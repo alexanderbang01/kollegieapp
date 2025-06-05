@@ -466,18 +466,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    // Tilføjet Expanded her
-                    child: Text(
-                      'Notifikationer',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
+                  Text(
+                    'Notifikationer',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
                     ),
                   ),
-                  if (_unreadNotificationCount > 0) ...[
+                  const SizedBox(width: 8),
+                  if (_unreadNotificationCount > 0)
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -496,29 +494,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      // Ændret fra ingen wrapper til Flexible
-                      child: TextButton(
-                        onPressed: _markAllNotificationsAsRead,
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  const Spacer(),
+                  if (_unreadNotificationCount > 0)
+                    TextButton(
+                      onPressed: _markAllNotificationsAsRead,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                        child: Text(
-                          'Marker alle',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.primary,
-                          ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Marker alle',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.primary,
                         ),
                       ),
                     ),
-                  ],
                 ],
               ),
             ),
@@ -900,21 +895,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       } else if (difference.inDays < 7) {
         return '${difference.inDays}d siden';
       } else {
-        final months = [
-          'jan',
-          'feb',
-          'mar',
-          'apr',
-          'maj',
-          'jun',
-          'jul',
-          'aug',
-          'sep',
-          'okt',
-          'nov',
-          'dec',
-        ];
-        return '${date.day}. ${months[date.month - 1]}';
+        // DD-MM-YYYY format
+        return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
       }
     } catch (e) {
       return dateString;
