@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kollegieapp/widgets/theme_switch.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
+import '../services/user_service.dart';
 import '../widgets/navigation_menu.dart';
 import '../utils/constants.dart';
 import '../utils/theme.dart';
@@ -15,6 +16,36 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  Map<String, String?> _userData = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final userData = await UserService.getUserData();
+      setState(() {
+        _userData = userData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fejl ved indlæsning af brugerdata: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,21 +152,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   child: Padding(
                     padding: AppSpacing.cardPadding,
-                    child: Column(
-                      children: [
-                        _buildInfoRow(context, 'Navn', 'Alexander Jensen'),
-                        const Divider(),
-                        _buildInfoRow(
-                          context,
-                          'Email',
-                          'alexander@example.com',
-                        ),
-                        const Divider(),
-                        _buildInfoRow(context, 'Telefon', '+45 12 34 56 78'),
-                        const Divider(),
-                        _buildInfoRow(context, 'Værelse', 'A-204'),
-                      ],
-                    ),
+                    child: _isLoading
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        : Column(
+                            children: [
+                              _buildInfoRow(
+                                context,
+                                'Navn',
+                                '${_userData['firstName'] ?? ''} ${_userData['lastName'] ?? ''}'
+                                    .trim(),
+                              ),
+                              const Divider(),
+                              _buildInfoRow(
+                                context,
+                                'Email',
+                                _userData['email'] ?? 'Ikke angivet',
+                              ),
+                              const Divider(),
+                              _buildInfoRow(
+                                context,
+                                'Telefon',
+                                _userData['phone'] ?? 'Ikke angivet',
+                              ),
+                              const Divider(),
+                              _buildInfoRow(
+                                context,
+                                'Værelse',
+                                _userData['roomNumber'] ?? 'Ikke angivet',
+                              ),
+                              const Divider(),
+                              _buildInfoRow(
+                                context,
+                                'Nødkontakt',
+                                _userData['contactName'] ?? 'Ikke angivet',
+                              ),
+                              const Divider(),
+                              _buildInfoRow(
+                                context,
+                                'Nødkontakt telefon',
+                                _userData['contactPhone'] ?? 'Ikke angivet',
+                              ),
+                            ],
+                          ),
                   ),
                 ),
 
@@ -181,14 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Center(
                   child: ElevatedButton(
                     onPressed: () {
-                      // Implementer log ud logik her
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Log ud funktion vil blive implementeret senere',
-                          ),
-                        ),
-                      );
+                      _showLogoutDialog(context);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
@@ -205,6 +261,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -233,7 +290,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Flexible(
             // Flexible sikrer at værdien ikke overskrider skærmens bredde
             child: Text(
-              value,
+              value.isEmpty ? 'Ikke angivet' : value,
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -243,6 +300,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Log ud'),
+          content: const Text('Er du sikker på, at du vil logge ud?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Annuller'),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await UserService.logoutUser();
+                  if (mounted) {
+                    Navigator.of(context).pop(); // Luk dialog
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/', // Naviger til registreringsskærm
+                      (route) => false,
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.of(context).pop(); // Luk dialog
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Fejl ved logout: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('Log ud', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
     );
   }
 }

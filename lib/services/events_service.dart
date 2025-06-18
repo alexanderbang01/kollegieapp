@@ -51,8 +51,6 @@ class EventsService {
     );
   }
 
-  // I lib/services/events_service.dart - erstat disse metoder:
-
   static Future<Map<String, dynamic>> registerForEvent({
     required String userId,
     required String userType,
