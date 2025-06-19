@@ -1,9 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/constants.dart';
 import '../utils/theme.dart';
 import '../widgets/success_notification.dart';
 import '../services/auth_service.dart';
+
+// Custom formatter for phone numbers
+class _PhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll(' ', '');
+
+    if (text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    String formatted = '';
+    for (int i = 0; i < text.length && i < 8; i++) {
+      if (i == 2 || i == 4 || i == 6) {
+        formatted += ' ';
+      }
+      formatted += text[i];
+    }
+
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({Key? key}) : super(key: key);
@@ -29,6 +58,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -51,10 +85,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        roomNumber: _roomNumberController.text.trim().toUpperCase(),
+        phone: _phoneController.text.replaceAll(' ', ''),
+        roomNumber: _roomNumberController.text.trim(),
         contactName: _contactNameController.text.trim(),
-        contactPhone: _contactPhoneController.text.trim(),
+        contactPhone: _contactPhoneController.text.replaceAll(' ', ''),
       );
 
       if (response['success'] == true) {
@@ -63,7 +97,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
         // Gem brugerdata lokalt med det rigtige ID fra serveren
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_id', userId); // Vigtigt: brug ID fra server
+        await prefs.setString('user_id', userId);
         await prefs.setString('user_first_name', userData['first_name']);
         await prefs.setString('user_last_name', userData['last_name']);
         await prefs.setString('user_email', userData['email']);
@@ -75,7 +109,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         );
         await prefs.setString(
           'user_contact_phone',
-          _contactPhoneController.text.trim(),
+          _contactPhoneController.text.replaceAll(' ', ''),
         );
         await prefs.setString('user_type', 'resident');
         await prefs.setBool('is_registered', true);
@@ -388,15 +422,24 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             decoration: const InputDecoration(
               labelText: 'Telefonnummer',
               prefixIcon: Icon(Icons.phone),
-              hintText: '+45 12 34 56 78',
+              hintText: '12 34 56 78',
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Indtast dit telefonnummer';
               }
+              String cleanedValue = value.replaceAll(' ', '');
+              if (!RegExp(r'^\d{8}$').hasMatch(cleanedValue)) {
+                return 'Telefonnummer skal være 8 cifre';
+              }
               return null;
             },
             keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(11),
+              _PhoneNumberFormatter(),
+            ],
           ),
           const SizedBox(height: 16),
 
@@ -405,15 +448,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             decoration: const InputDecoration(
               labelText: 'Værelsenummer',
               prefixIcon: Icon(Icons.door_front_door),
-              hintText: 'A-204',
+              hintText: '204',
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Indtast dit værelsenummer';
               }
+              if (!RegExp(r'^\d{3}$').hasMatch(value.trim())) {
+                return 'Værelsenummer skal være 3 cifre (f.eks. 204)';
+              }
               return null;
             },
-            textCapitalization: TextCapitalization.characters,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(3),
+            ],
           ),
         ],
       ),
@@ -427,7 +477,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Nødkontakt',
+            'Nødkontakt (valgfrit)',
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
@@ -437,7 +487,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             'Person der kan kontaktes i nødstilfælde',
             style: TextStyle(color: Colors.grey.shade600),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
 
           TextFormField(
             controller: _contactNameController,
@@ -446,12 +496,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               prefixIcon: Icon(Icons.contact_emergency),
               hintText: 'F.eks. forælder eller ven',
             ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Indtast kontaktpersonens navn';
-              }
-              return null;
-            },
             textCapitalization: TextCapitalization.words,
           ),
           const SizedBox(height: 16),
@@ -461,15 +505,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             decoration: const InputDecoration(
               labelText: 'Kontaktpersonens telefon',
               prefixIcon: Icon(Icons.phone),
-              hintText: '+45 87 65 43 21',
+              hintText: '87 65 43 21',
             ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Indtast kontaktpersonens telefonnummer';
-              }
-              return null;
-            },
             keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(11),
+              _PhoneNumberFormatter(),
+            ],
           ),
           const SizedBox(height: 24),
 

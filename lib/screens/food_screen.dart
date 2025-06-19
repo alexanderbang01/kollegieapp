@@ -146,7 +146,6 @@ class _FoodScreenState extends State<FoodScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadFoodplan),
           IconButton(
             icon: const Icon(Icons.menu),
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
@@ -159,26 +158,30 @@ class _FoodScreenState extends State<FoodScreen> {
   }
 
   Widget _buildBody() {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Uge selector og titel
-            _buildWeekSelector(),
-            const SizedBox(height: 24),
+    return RefreshIndicator(
+      onRefresh: _loadFoodplan,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Uge selector og titel
+              _buildWeekSelector(),
+              const SizedBox(height: 24),
 
-            // Loading, error eller indhold
-            if (_isLoading)
-              _buildLoadingState()
-            else if (_errorMessage != null)
-              _buildErrorState()
-            else if (_currentMealPlan.isEmpty)
-              _buildEmptyState()
-            else
-              _buildMealPlanContent(),
-          ],
+              // Loading, error eller indhold
+              if (_isLoading)
+                _buildLoadingState()
+              else if (_errorMessage != null)
+                _buildErrorState()
+              else if (_currentMealPlan.isEmpty)
+                _buildEmptyState()
+              else
+                _buildMealPlanContent(),
+            ],
+          ),
         ),
       ),
     );
@@ -361,48 +364,36 @@ class _FoodScreenState extends State<FoodScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Dag og tid
+            // Dag og i dag badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      mad['dag'],
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    if (isToday)
-                      Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'I DAG',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
                 Text(
-                  'Kl. ${mad['tid']}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade700,
+                  mad['dag'],
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
+                if (isToday)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'I DAG',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
               ],
             ),
 

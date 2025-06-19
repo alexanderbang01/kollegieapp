@@ -165,7 +165,7 @@ class UserService {
     if (profileImage != null && profileImage.isNotEmpty) {
       // Hvis det er en relativ sti, tilføj base URL
       if (!profileImage.startsWith('http')) {
-        return 'http://localhost/kollegieapp-webadmin$profileImage';
+        return 'https://alexanderbang.com$profileImage';
       }
       return profileImage;
     }

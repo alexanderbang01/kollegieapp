@@ -84,7 +84,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final profileImage = widget.conversation['profileImage'];
     if (profileImage != null && profileImage.isNotEmpty) {
       if (!profileImage.startsWith('http')) {
-        return 'http://localhost/kollegieapp-webadmin$profileImage';
+        return 'https://alexanderbang.com$profileImage';
       }
       return profileImage;
     }

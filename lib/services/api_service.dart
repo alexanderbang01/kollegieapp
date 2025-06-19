@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // Base URL
-  static const String baseUrl = 'http://localhost/kollegieapp-webadmin/api';
+  static const String baseUrl = 'https://alexanderbang.com/api';
 
   static const Duration timeout = Duration(seconds: 30);
 
