@@ -195,6 +195,14 @@ class _NavigationMenuState extends State<NavigationMenu> {
                   route: contactsRoute,
                   isActive: widget.currentRoute == contactsRoute,
                 ),
+                // Tilføjer Info navigation item
+                _buildNavItem(
+                  context: context,
+                  icon: AppIcons.info,
+                  title: AppText.infoTitle,
+                  route: infoRoute,
+                  isActive: widget.currentRoute == infoRoute,
+                ),
 
                 // Divider for at separere navigation og personlige indstillinger
                 const Padding(

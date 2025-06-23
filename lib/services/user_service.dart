@@ -165,7 +165,7 @@ class UserService {
     if (profileImage != null && profileImage.isNotEmpty) {
       // Hvis det er en relativ sti, tilføj base URL
       if (!profileImage.startsWith('http')) {
-        return 'https://alexanderbang.com$profileImage';
+        return 'https://kollegie.socdata.dk$profileImage';
       }
       return profileImage;
     }

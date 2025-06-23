@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kollegieapp/screens/contacts_screen.dart';
 import 'package:kollegieapp/screens/chat_screen.dart';
 import 'package:kollegieapp/screens/registration_screen.dart';
+import 'package:kollegieapp/screens/info_screen.dart'; // Ny import
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
@@ -49,6 +50,7 @@ class MyApp extends StatelessWidget {
             newsRoute: (context) => const NewsScreen(),
             contactsRoute: (context) => const ContactsScreen(),
             messagesRoute: (context) => const MessagesScreen(),
+            infoRoute: (context) => const InfoScreen(), // Ny route
             '/registration': (context) => const RegistrationScreen(),
           },
         );
@@ -68,91 +70,55 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   void initState() {
     super.initState();
-    _checkUserRegistration();
+    _checkRegistrationStatus();
   }
 
-  Future<void> _checkUserRegistration() async {
-    // Lille delay for splash effect
+  Future<void> _checkRegistrationStatus() async {
+    // Lille forsinkelse for splash screen effekt
     await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
 
     try {
       final isRegistered = await UserService.isUserRegistered();
 
-      if (isRegistered) {
-        // Bruger er registreret, gå til hovedskærm
-        Navigator.of(context).pushReplacementNamed(homeRoute);
-      } else {
-        // Bruger er ikke registreret, gå til registrering
-        Navigator.of(context).pushReplacementNamed('/registration');
+      if (mounted) {
+        if (isRegistered) {
+          // Bruger er registreret, gå til home screen
+          Navigator.pushReplacementNamed(context, homeRoute);
+        } else {
+          // Bruger er ikke registreret, gå til registrering
+          Navigator.pushReplacementNamed(context, '/registration');
+        }
       }
     } catch (e) {
-      // Hvis der sker en fejl, gå til registrering for at være sikker
-      Navigator.of(context).pushReplacementNamed('/registration');
+      // Ved fejl, gå til registrering som fallback
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/registration');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: theme.colorScheme.primary,
-      body: Center(
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // App logo
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.home,
-                color: theme.colorScheme.primary,
-                size: 60,
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // App navn
+            // Logo placeholder - erstat med dit faktiske logo
+            Icon(Icons.home, size: 100, color: Colors.white),
+            SizedBox(height: 24),
             Text(
               appName,
-              style: theme.textTheme.headlineMedium?.copyWith(
+              style: TextStyle(
                 color: Colors.white,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Version $appVersion',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withOpacity(0.8),
-              ),
-            ),
-            const SizedBox(height: 48),
-
-            // Loading indicator
-            const CircularProgressIndicator(
+            SizedBox(height: 40),
+            CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Indlæser...',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withOpacity(0.8),
-              ),
             ),
           ],
         ),

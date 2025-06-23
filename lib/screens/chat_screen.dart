@@ -84,7 +84,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final profileImage = widget.conversation['profileImage'];
     if (profileImage != null && profileImage.isNotEmpty) {
       if (!profileImage.startsWith('http')) {
-        return 'https://alexanderbang.com$profileImage';
+        return 'https://kollegie.socdata.dk$profileImage';
       }
       return profileImage;
     }

@@ -156,7 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final response = await http.post(
         Uri.parse(
-          'https://alexanderbang.com/api/residents/upload_profile_image.php',
+          'https://kollegie.socdata.dk/api/residents/upload_profile_image.php',
         ),
         headers: {
           'Content-Type': 'application/json',
@@ -246,7 +246,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final response = await http.put(
         Uri.parse(
-          'https://alexanderbang.com/api/residents/update_resident.php',
+          'https://kollegie.socdata.dk/api/residents/update_resident.php',
         ),
         headers: {
           'Content-Type': 'application/json',

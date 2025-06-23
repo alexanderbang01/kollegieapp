@@ -19,6 +19,7 @@ const String newsRoute = '/news';
 const String contactsRoute = '/contacts';
 const String messagesRoute = '/messages';
 const String chatRoute = '/chat';
+const String infoRoute = '/info'; // Ny route tilføjet
 
 // Tekststrenge
 class AppText {
@@ -35,6 +36,7 @@ class AppText {
   static const String newsTitle = 'Nyheder';
   static const String contactsTitle = 'Kontaktpersoner';
   static const String messagesTitle = 'Beskeder';
+  static const String infoTitle = 'Info'; // Ny titel tilføjet
 
   static const String darkModeSwitch = 'Mørk tilstand';
   static const String notificationsSwitch = 'Notifikationer';
@@ -54,7 +56,8 @@ class AppIcons {
   static const IconData about = Icons.info;
   static const IconData news = Icons.newspaper;
   static const IconData contacts = Icons.contact_phone;
-  static const IconData messages = Icons.message; // Nyt ikon tilføjet
+  static const IconData messages = Icons.message;
+  static const IconData info = Icons.info_outline; // Nyt ikon tilføjet
 
   static const IconData darkMode = Icons.dark_mode;
   static const IconData lightMode = Icons.light_mode;
