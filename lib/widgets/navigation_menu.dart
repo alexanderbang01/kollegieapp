@@ -183,13 +183,6 @@ class _NavigationMenuState extends State<NavigationMenu> {
                 ),
                 _buildNavItem(
                   context: context,
-                  icon: AppIcons.messages,
-                  title: AppText.messagesTitle,
-                  route: messagesRoute,
-                  isActive: widget.currentRoute == messagesRoute,
-                ),
-                _buildNavItem(
-                  context: context,
                   icon: AppIcons.contacts,
                   title: AppText.contactsTitle,
                   route: contactsRoute,

@@ -10,7 +10,7 @@ import 'screens/food_screen.dart';
 import 'screens/news_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/events_screen.dart';
-import 'screens/messages_screen.dart';
+// import 'screens/messages_screen.dart'; // Kommenteret ud - funktionalitet ikke ønsket lige nu
 import 'services/theme_service.dart';
 import 'services/user_service.dart';
 import 'utils/constants.dart';
@@ -49,7 +49,7 @@ class MyApp extends StatelessWidget {
             eventsRoute: (context) => const EventsScreen(),
             newsRoute: (context) => const NewsScreen(),
             contactsRoute: (context) => const ContactsScreen(),
-            messagesRoute: (context) => const MessagesScreen(),
+            // messagesRoute: (context) => const MessagesScreen(), // Kommenteret ud - funktionalitet ikke ønsket lige nu
             infoRoute: (context) => const InfoScreen(), // Ny route
             '/registration': (context) => const RegistrationScreen(),
           },

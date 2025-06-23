@@ -215,10 +215,8 @@ class _InfoScreenState extends State<InfoScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            '• Weekend tilmelding gælder fra fredag aften til søndag aften\n'
+            '• Du skal have en gyldig grund til at blive på kollegiet\n'
             '• Du får adgang til fællesområderne hele weekenden\n'
-            '• Madplan for weekenden sendes til tilmeldte beboere\n'
-            '• Særlige aktiviteter arrangeres ofte i weekenderne\n'
             '• Husk at afmelde dig hvis planerne ændrer sig',
             style: TextStyle(
               fontSize: 15,
@@ -247,7 +245,7 @@ class _InfoScreenState extends State<InfoScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Tilmelding sker via kollegiets reception eller appen',
+                    'Tilmelding sker via kollegiets reception',
                     style: TextStyle(
                       fontSize: 14,
                       color: theme.colorScheme.primary,
