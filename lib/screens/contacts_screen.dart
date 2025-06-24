@@ -38,6 +38,35 @@ class _ContactsScreenState extends State<ContactsScreen> {
     super.dispose();
   }
 
+  bool _isEmergencyHours() {
+    final now = DateTime.now();
+    final hour = now.hour;
+
+    // Vagttelefon er aktiv mellem 15:00 og 08:00 næste dag
+    // Det betyder fra 15:00-23:59 og 00:00-07:59
+    return hour >= 15 || hour < 8;
+  }
+
+  // Hjælpefunktion til at generere initialer
+  String _generateInitials(String name) {
+    if (name.isEmpty) return 'U';
+
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+    } else {
+      return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
+    }
+  }
+
+  // Tjek om profile image URL er gyldig
+  bool _hasValidProfileImage(String? profileImage) {
+    return profileImage != null &&
+        profileImage.isNotEmpty &&
+        (profileImage.startsWith('http://') ||
+            profileImage.startsWith('https://'));
+  }
+
   Future<void> _loadContacts() async {
     setState(() {
       _isLoading = true;
@@ -45,7 +74,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
     });
 
     try {
-      final response = await EmployeesService.getEmployees();
+      // Brug getContactEmployees som respekterer sorteringsrækkefølgen fra admin
+      final response = await EmployeesService.getContactEmployees();
 
       if (response['success'] == true) {
         final List<dynamic> contactsData = response['data'] ?? [];
@@ -309,7 +339,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
       );
     }
 
-    if (_filteredContacts.isEmpty) {
+    if (_filteredContacts.isEmpty && _searchQuery.isNotEmpty) {
       return _buildEmptyState();
     }
 
@@ -351,16 +381,23 @@ class _ContactsScreenState extends State<ContactsScreen> {
       onRefresh: _loadContacts,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        itemCount: _filteredContacts.length,
+        itemCount: _filteredContacts.length + 1, // +1 for vagttelefon kort
         itemBuilder: (context, index) {
-          final contact = _filteredContacts[index];
+          // Vagttelefon som første element (index 0)
+          if (index == 0) {
+            return _buildEmergencyCard();
+          }
+
+          // Normale kontakter (juster index med -1)
+          final contactIndex = index - 1;
+          final contact = _filteredContacts[contactIndex];
           return _buildContactCard(contact);
         },
       ),
     );
   }
 
-  Widget _buildContactCard(Map<String, dynamic> contact) {
+  Widget _buildEmergencyCard() {
     final theme = Theme.of(context);
 
     return Card(
@@ -375,28 +412,178 @@ class _ContactsScreenState extends State<ContactsScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Kontakt avatar
+                // Vagttelefon avatar
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.red.withOpacity(0.1),
+                  child: Text(
+                    'VT',
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Vagttelefon',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Tilgængelig kl. 15:00 - 08:00',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.red.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+
+            // Telefonnummer - kun opkald (ingen SMS)
+            InkWell(
+              onTap: () => _makePhoneCall('+4589503381'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.phone,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '+45 89 50 33 81',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Kun opkald',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Email
+            InkWell(
+              onTap: () => _sendEmail('ophold@mercantec.dk'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.email,
+                      size: 20,
+                      color: theme.colorScheme.secondary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'ophold@mercantec.dk',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: theme.colorScheme.secondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactCard(Map<String, dynamic> contact) {
+    final theme = Theme.of(context);
+    final contactName = contact['name'] ?? 'Ukendt navn';
+    final profileImageUrl = contact['profile_image'];
+    final initials = _generateInitials(contactName);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Kontakt avatar med profilbillede eller initialer
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                  backgroundImage:
-                      contact['profile_image'] != null &&
-                          contact['profile_image'].isNotEmpty
-                      ? NetworkImage(contact['profile_image'])
+                  backgroundImage: _hasValidProfileImage(profileImageUrl)
+                      ? NetworkImage(profileImageUrl!)
                       : null,
-                  child:
-                      contact['profile_image'] == null ||
-                          contact['profile_image'].isEmpty
-                      ? Text(
-                          contact['initials'] ??
-                              contact['name']?.substring(0, 1) ??
-                              'U',
+                  child: _hasValidProfileImage(profileImageUrl)
+                      ? null
+                      : Text(
+                          initials,
                           style: TextStyle(
                             color: theme.colorScheme.primary,
                             fontWeight: FontWeight.bold,
                             fontSize: 22,
                           ),
-                        )
+                        ),
+                  onBackgroundImageError: _hasValidProfileImage(profileImageUrl)
+                      ? (exception, stackTrace) {
+                          // Hvis billedet fejler, vil child blive vist i stedet
+                        }
                       : null,
                 ),
                 const SizedBox(width: 16),
@@ -405,7 +592,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        contact['name'] ?? 'Ukendt navn',
+                        contactName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -422,7 +609,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          contact['role'] ?? 'Ukendt rolle',
+                          contact['role'] ??
+                              contact['profession'] ??
+                              'Ukendt rolle',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,

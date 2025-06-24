@@ -75,7 +75,7 @@ class _AppInitializerState extends State<AppInitializer> {
 
   Future<void> _checkRegistrationStatus() async {
     // Lille forsinkelse for splash screen effekt
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 1));
 
     try {
       final isRegistered = await UserService.isUserRegistered();

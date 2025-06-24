@@ -31,7 +31,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
   bool _isSending = false;
   String _userInitials = '';
-  String? _userProfileImageUrl;
   Timer? _messageTimer;
 
   @override
@@ -61,11 +60,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadUserData() async {
     final initials = await UserService.getUserInitials();
-    final profileImageUrl = await UserService.getProfileImageUrl();
 
     setState(() {
       _userInitials = initials;
-      _userProfileImageUrl = profileImageUrl;
     });
   }
 
@@ -78,17 +75,6 @@ class _ChatScreenState extends State<ChatScreen> {
     } else {
       return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
     }
-  }
-
-  String _getContactProfileImageUrl() {
-    final profileImage = widget.conversation['profileImage'];
-    if (profileImage != null && profileImage.isNotEmpty) {
-      if (!profileImage.startsWith('http')) {
-        return 'https://kollegie.socdata.dk$profileImage';
-      }
-      return profileImage;
-    }
-    return '';
   }
 
   Future<void> _loadMessages({bool showLoading = true}) async {
@@ -227,7 +213,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final bool isStaff = widget.conversation['type'] == 'staff';
     final String contactName = widget.conversation['name'] ?? 'Ukendt';
     final String contactInitials = _generateInitials(contactName);
-    final String contactProfileImageUrl = _getContactProfileImageUrl();
 
     return Scaffold(
       appBar: AppBar(
@@ -238,19 +223,14 @@ class _ChatScreenState extends State<ChatScreen> {
               backgroundColor: isStaff
                   ? theme.colorScheme.primary.withOpacity(0.3)
                   : theme.colorScheme.secondary.withOpacity(0.3),
-              backgroundImage: contactProfileImageUrl.isNotEmpty
-                  ? NetworkImage(contactProfileImageUrl)
-                  : null,
-              child: contactProfileImageUrl.isEmpty
-                  ? Text(
-                      contactInitials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    )
-                  : null,
+              child: Text(
+                contactInitials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -356,7 +336,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final bool isCurrentUser = message.isCurrentUser;
     final String contactName = widget.conversation['name'] ?? 'Ukendt';
     final String contactInitials = _generateInitials(contactName);
-    final String contactProfileImageUrl = _getContactProfileImageUrl();
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -369,19 +348,14 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 16,
               backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-              backgroundImage: contactProfileImageUrl.isNotEmpty
-                  ? NetworkImage(contactProfileImageUrl)
-                  : null,
-              child: contactProfileImageUrl.isEmpty
-                  ? Text(
-                      contactInitials,
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    )
-                  : null,
+              child: Text(
+                contactInitials,
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -437,19 +411,14 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 16,
               backgroundColor: theme.colorScheme.primary.withOpacity(0.7),
-              backgroundImage: _userProfileImageUrl != null
-                  ? NetworkImage(_userProfileImageUrl!)
-                  : null,
-              child: _userProfileImageUrl == null
-                  ? Text(
-                      _userInitials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
-                      ),
-                    )
-                  : null,
+              child: Text(
+                _userInitials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
+              ),
             ),
           ],
         ],

@@ -19,7 +19,7 @@ const String newsRoute = '/news';
 const String contactsRoute = '/contacts';
 const String messagesRoute = '/messages';
 const String chatRoute = '/chat';
-const String infoRoute = '/info'; // Ny route tilføjet
+const String infoRoute = '/info';
 
 // Tekststrenge
 class AppText {
@@ -36,7 +36,7 @@ class AppText {
   static const String newsTitle = 'Nyheder';
   static const String contactsTitle = 'Kontaktpersoner';
   static const String messagesTitle = 'Beskeder';
-  static const String infoTitle = 'Info'; // Ny titel tilføjet
+  static const String infoTitle = 'Info';
 
   static const String darkModeSwitch = 'Mørk tilstand';
   static const String notificationsSwitch = 'Notifikationer';

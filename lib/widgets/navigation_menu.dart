@@ -16,7 +16,6 @@ class _NavigationMenuState extends State<NavigationMenu> {
   String _userName = '';
   String _userEmail = '';
   String _userInitials = '';
-  String? _profileImageUrl;
 
   @override
   void initState() {
@@ -28,7 +27,6 @@ class _NavigationMenuState extends State<NavigationMenu> {
     try {
       final userData = await UserService.getUserData();
       final initials = await UserService.getUserInitials();
-      final profileImageUrl = await UserService.getProfileImageUrl();
 
       if (mounted) {
         setState(() {
@@ -37,7 +35,6 @@ class _NavigationMenuState extends State<NavigationMenu> {
                   .trim();
           _userEmail = userData['email'] ?? '';
           _userInitials = initials;
-          _profileImageUrl = profileImageUrl;
 
           // Fallback hvis data mangler
           if (_userName.isEmpty) _userName = 'Bruger';
@@ -51,7 +48,6 @@ class _NavigationMenuState extends State<NavigationMenu> {
           _userName = 'Bruger';
           _userEmail = 'Ingen email';
           _userInitials = 'U';
-          _profileImageUrl = null;
         });
       }
     }
@@ -84,19 +80,14 @@ class _NavigationMenuState extends State<NavigationMenu> {
                       CircleAvatar(
                         radius: 40,
                         backgroundColor: Colors.white,
-                        backgroundImage: _profileImageUrl != null
-                            ? NetworkImage(_profileImageUrl!)
-                            : null,
-                        child: _profileImageUrl == null
-                            ? Text(
-                                _userInitials,
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              )
-                            : null,
+                        child: Text(
+                          _userInitials,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(

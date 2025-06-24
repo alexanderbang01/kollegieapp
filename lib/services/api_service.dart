@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // Base URL
+  // Base URL til korrekt server
   static const String baseUrl = 'https://kollegie.socdata.dk/api';
 
   static const Duration timeout = Duration(seconds: 30);

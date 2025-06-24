@@ -30,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _userInitials = '';
   String _currentUserId = '';
   String _currentUserType = '';
-  String? _profileImageUrl;
 
   // Madplan data - følger samme mønster som food_screen.dart
   List<Map<String, dynamic>> _currentMealPlan = [];
@@ -106,7 +105,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final initials = await UserService.getUserInitials();
       final userId = await UserService.getUserId();
       final userType = await UserService.getUserType();
-      final profileImageUrl = await UserService.getProfileImageUrl();
 
       if (mounted) {
         setState(() {
@@ -114,7 +112,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _userInitials = initials;
           _currentUserId = userId;
           _currentUserType = userType;
-          _profileImageUrl = profileImageUrl;
         });
       }
     } catch (e) {
@@ -123,7 +120,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         setState(() {
           _userName = 'Bruger';
           _userInitials = 'U';
-          _profileImageUrl = null;
         });
       }
     }
@@ -963,18 +959,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     CircleAvatar(
                       radius: 20,
                       backgroundColor: theme.colorScheme.primary,
-                      backgroundImage: _profileImageUrl != null
-                          ? NetworkImage(_profileImageUrl!)
-                          : null,
-                      child: _profileImageUrl == null
-                          ? Text(
-                              _userInitials,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : null,
+                      child: Text(
+                        _userInitials,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Column(

@@ -44,10 +44,8 @@ class _NewsScreenState extends State<NewsScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      _loadMoreNews();
-    }
+    // Fjernet automatisk scroll-to-load
+    // Nu bruger vi kun "Indlæs flere" knappen
   }
 
   Future<void> _initializeUser() async {
@@ -84,7 +82,7 @@ class _NewsScreenState extends State<NewsScreen> {
         userId: _currentUserId,
         featuredOnly: _showFeaturedOnly,
         page: _currentPage,
-        limit: 20,
+        limit: 6, // ÆNDRET: Kun 6 nyheder per side
       );
 
       if (response['success'] == true) {
@@ -128,7 +126,7 @@ class _NewsScreenState extends State<NewsScreen> {
         userId: _currentUserId,
         featuredOnly: _showFeaturedOnly,
         page: _currentPage,
-        limit: 20,
+        limit: 6, // ÆNDRET: Kun 6 nyheder per side
       );
 
       if (response['success'] == true) {
@@ -155,13 +153,28 @@ class _NewsScreenState extends State<NewsScreen> {
   }
 
   Future<void> _markNewsAsRead(Map<String, dynamic> news) async {
+    // Skip hvis allerede læst
+    if (news['is_read'] == true) {
+      return;
+    }
+
     try {
-      await NewsService.markNewsAsRead(
+      final response = await NewsService.markNewsAsRead(
         userId: _currentUserId,
         newsId: news['id'] as int,
       );
+
+      if (response['success'] == true) {
+        // Opdater lokalt state
+        setState(() {
+          final index = _news.indexWhere((n) => n['id'] == news['id']);
+          if (index != -1) {
+            _news[index]['is_read'] = true;
+          }
+        });
+      }
     } catch (e) {
-      print('Fejl ved markering som læst: $e');
+      // Silent error - fejl skal ikke forstyrre brugeroplevelsen
     }
   }
 
@@ -303,41 +316,101 @@ class _NewsScreenState extends State<NewsScreen> {
   Widget _buildNewsList() {
     return RefreshIndicator(
       onRefresh: () => _loadNews(refresh: true),
-      child: ListView.builder(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        itemCount: _news.length + (_isLoadingMore ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == _news.length) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: CircularProgressIndicator(),
+      child: Column(
+        children: [
+          // Pagination info
+          if (_news.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Side $_currentPage',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                  ),
+                  Text(
+                    '${_news.length} nyheder vist',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                  ),
+                ],
               ),
-            );
-          }
+            ),
 
-          final news = _news[index];
-          return _buildNewsCard(context, news);
-        },
+          // News list
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount:
+                  _news.length +
+                  (_isLoadingMore ? 1 : 0) +
+                  (_hasMore && !_isLoadingMore ? 1 : 0),
+              itemBuilder: (context, index) {
+                // Loading indicator
+                if (index == _news.length && _isLoadingMore) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+
+                // Load more button
+                if (index == _news.length && _hasMore && !_isLoadingMore) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: ElevatedButton(
+                        onPressed: _loadMoreNews,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: const Text('Indlæs flere nyheder'),
+                      ),
+                    ),
+                  );
+                }
+
+                final news = _news[index];
+                return _buildNewsCard(context, news);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildNewsCard(BuildContext context, Map<String, dynamic> news) {
     final theme = Theme.of(context);
+    final isRead = news['is_read'] == true;
 
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: theme.colorScheme.primary.withOpacity(0.05),
+      color: isRead
+          ? theme.colorScheme.surface.withOpacity(0.5)
+          : theme.colorScheme.primary.withOpacity(0.05),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          _markNewsAsRead(news);
-          _showNewsDetails(context, news);
+        onTap: () async {
+          // Marker som læst FØRST
+          await _markNewsAsRead(news);
+          // Så vis detaljer
+          if (mounted) {
+            _showNewsDetails(context, news);
+          }
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -387,10 +460,22 @@ class _NewsScreenState extends State<NewsScreen> {
                         ),
                       ),
                     ),
+                  // CHECK MARK IKON - kun på nyhedslisten
+                  if (isRead)
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      child: Icon(
+                        Icons.check_circle,
+                        size: 16,
+                        color: Colors.green.shade600,
+                      ),
+                    ),
                   Text(
                     _formatDate(news['published_at']),
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade700,
+                      color: isRead
+                          ? Colors.grey.shade500
+                          : Colors.grey.shade700,
                     ),
                   ),
                 ],
@@ -400,6 +485,7 @@ class _NewsScreenState extends State<NewsScreen> {
                 news['title'],
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: isRead ? Colors.grey.shade600 : null,
                 ),
               ),
               const SizedBox(height: 8),
@@ -407,27 +493,27 @@ class _NewsScreenState extends State<NewsScreen> {
                 news['content'],
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: isRead ? Colors.grey.shade500 : null,
+                ),
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.person, size: 16, color: Colors.grey.shade700),
+                  Icon(
+                    Icons.person,
+                    size: 16,
+                    color: isRead ? Colors.grey.shade500 : Colors.grey.shade700,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     news['author'],
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade700,
+                      color: isRead
+                          ? Colors.grey.shade500
+                          : Colors.grey.shade700,
                       fontWeight: FontWeight.w500,
                     ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () {
-                      _markNewsAsRead(news);
-                      _showNewsDetails(context, news);
-                    },
-                    child: const Text('Læs mere'),
                   ),
                 ],
               ),
@@ -493,6 +579,7 @@ class _NewsScreenState extends State<NewsScreen> {
                         ),
                       ),
                     ),
+                  // INGEN CHECK MARK IKON her i detalje-visningen
                   const Spacer(),
                   Text(
                     _formatDate(news['published_at']),

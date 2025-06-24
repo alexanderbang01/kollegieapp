@@ -21,7 +21,6 @@ class UserService {
       'contactPhone': prefs.getString('user_contact_phone'),
       'userType': prefs.getString('user_type'),
       'userId': prefs.getString('user_id'),
-      'profileImage': prefs.getString('user_profile_image'),
     };
   }
 
@@ -86,7 +85,6 @@ class UserService {
       'roomNumber': 'user_room_number',
       'contactName': 'user_contact_name',
       'contactPhone': 'user_contact_phone',
-      'profileImage': 'user_profile_image',
       'userType': 'user_type',
       'userId': 'user_id',
     };
@@ -109,7 +107,6 @@ class UserService {
     required String roomNumber,
     required String contactName,
     required String contactPhone,
-    String? profileImage,
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -123,10 +120,6 @@ class UserService {
     await prefs.setString('user_contact_phone', contactPhone);
     await prefs.setString('user_type', 'resident');
     await prefs.setBool('is_registered', true);
-
-    if (profileImage != null) {
-      await prefs.setString('user_profile_image', profileImage);
-    }
   }
 
   // Generer initialer fra navn
@@ -155,21 +148,5 @@ class UserService {
         userData['email']?.isNotEmpty == true &&
         userData['phone']?.isNotEmpty == true &&
         userData['roomNumber']?.isNotEmpty == true;
-  }
-
-  // Hent profil billede URL med korrekt base URL
-  static Future<String?> getProfileImageUrl() async {
-    final userData = await getUserData();
-    final profileImage = userData['profileImage'];
-
-    if (profileImage != null && profileImage.isNotEmpty) {
-      // Hvis det er en relativ sti, tilføj base URL
-      if (!profileImage.startsWith('http')) {
-        return 'https://kollegie.socdata.dk$profileImage';
-      }
-      return profileImage;
-    }
-
-    return null;
   }
 }
