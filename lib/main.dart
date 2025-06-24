@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:kollegieapp/screens/contacts_screen.dart';
-import 'package:kollegieapp/screens/chat_screen.dart';
-import 'package:kollegieapp/screens/registration_screen.dart';
-import 'package:kollegieapp/screens/info_screen.dart'; // Ny import
+import 'package:kollegie_app/screens/contacts_screen.dart';
+import 'package:kollegie_app/screens/chat_screen.dart';
+import 'package:kollegie_app/screens/registration_screen.dart';
+import 'package:kollegie_app/screens/info_screen.dart';
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';

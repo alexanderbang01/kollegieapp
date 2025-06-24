@@ -1,7 +1,7 @@
-name: kollegieapp
+name: kollegie_app
 description: "Kollegie app for Mercantec's kolleige i Viborg"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+12
 
 environment:
   sdk: ">=3.8.0 <4.0.0"

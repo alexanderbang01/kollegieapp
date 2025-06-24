@@ -28,6 +28,35 @@ class _RoomNumberFormatter extends TextInputFormatter {
   }
 }
 
+// Custom formatter for telefonnummer - kun tillader 8 cifre med mellemrum hver anden cifre
+class _PhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Fjern alle ikke-numeriske tegn
+    final text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    // Begræns til maksimalt 8 cifre
+    final limitedText = text.length > 8 ? text.substring(0, 8) : text;
+
+    // Formater med mellemrum hver anden cifre (XX XX XX XX)
+    String formattedText = '';
+    for (int i = 0; i < limitedText.length; i++) {
+      if (i > 0 && i % 2 == 0) {
+        formattedText += ' ';
+      }
+      formattedText += limitedText[i];
+    }
+
+    return newValue.copyWith(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
+    );
+  }
+}
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
@@ -78,6 +107,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  // Helper funktion til at formatere telefonnummer til visning
+  String _formatPhoneForDisplay(String phone) {
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanPhone.length != 8) return phone;
+
+    return '${cleanPhone.substring(0, 2)} ${cleanPhone.substring(2, 4)} ${cleanPhone.substring(4, 6)} ${cleanPhone.substring(6, 8)}';
+  }
+
+  // Helper funktion til at fjerne formatering før gem
+  String _cleanPhoneNumber(String phone) {
+    return phone.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
   Future<void> _loadUserData() async {
     setState(() {
       _isLoading = true;
@@ -95,10 +137,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _firstNameController.text = userData['firstName'] ?? '';
         _lastNameController.text = userData['lastName'] ?? '';
         _emailController.text = userData['email'] ?? '';
-        _phoneController.text = userData['phone'] ?? '';
+        // Formater telefonnumre når de indlæses
+        _phoneController.text = _formatPhoneForDisplay(userData['phone'] ?? '');
         _roomNumberController.text = userData['roomNumber'] ?? '';
         _contactNameController.text = userData['contactName'] ?? '';
-        _contactPhoneController.text = userData['contactPhone'] ?? '';
+        _contactPhoneController.text = _formatPhoneForDisplay(
+          userData['contactPhone'] ?? '',
+        );
 
         _isLoading = false;
       });
@@ -133,6 +178,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return null;
   }
 
+  // Validering for telefonnummer
+  String? _validatePhoneNumber(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null; // Telefonnummer er ikke påkrævet
+    }
+
+    final cleanPhone = _cleanPhoneNumber(value);
+    if (cleanPhone.length != 8) {
+      return 'Telefonnummer skal være præcis 8 cifre';
+    }
+
+    return null;
+  }
+
   Future<void> _updateProfile() async {
     // Valider værelsenummer før opdatering
     final roomValidation = _validateRoomNumber(_roomNumberController.text);
@@ -141,6 +200,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
         context,
         title: 'Fejl',
         message: roomValidation,
+        icon: Icons.error_outline,
+        color: Colors.red,
+      );
+      return;
+    }
+
+    // Valider telefonnumre
+    final phoneValidation = _validatePhoneNumber(_phoneController.text);
+    if (phoneValidation != null) {
+      SuccessNotification.show(
+        context,
+        title: 'Fejl',
+        message: phoneValidation,
+        icon: Icons.error_outline,
+        color: Colors.red,
+      );
+      return;
+    }
+
+    final contactPhoneValidation = _validatePhoneNumber(
+      _contactPhoneController.text,
+    );
+    if (contactPhoneValidation != null) {
+      SuccessNotification.show(
+        context,
+        title: 'Fejl',
+        message: 'Kontaktperson $contactPhoneValidation',
         icon: Icons.error_outline,
         color: Colors.red,
       );
@@ -158,10 +244,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'first_name': _firstNameController.text.trim(),
         'last_name': _lastNameController.text.trim(),
         'email': _emailController.text.trim(),
-        'phone': _phoneController.text.trim(),
+        'phone': _cleanPhoneNumber(_phoneController.text), // Fjern formatering
         'room_number': _roomNumberController.text.trim(),
         'contact_name': _contactNameController.text.trim(),
-        'contact_phone': _contactPhoneController.text.trim(),
+        'contact_phone': _cleanPhoneNumber(
+          _contactPhoneController.text,
+        ), // Fjern formatering
       };
 
       print('Update request body: $requestBody'); // Debug output
@@ -187,10 +275,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'firstName': _firstNameController.text.trim(),
           'lastName': _lastNameController.text.trim(),
           'email': _emailController.text.trim(),
-          'phone': _phoneController.text.trim(),
+          'phone': _cleanPhoneNumber(_phoneController.text),
           'roomNumber': _roomNumberController.text.trim(),
           'contactName': _contactNameController.text.trim(),
-          'contactPhone': _contactPhoneController.text.trim(),
+          'contactPhone': _cleanPhoneNumber(_contactPhoneController.text),
         });
 
         // Reload user data and exit edit modes
@@ -237,10 +325,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _firstNameController.text = _userData['firstName'] ?? '';
       _lastNameController.text = _userData['lastName'] ?? '';
       _emailController.text = _userData['email'] ?? '';
-      _phoneController.text = _userData['phone'] ?? '';
+      _phoneController.text = _formatPhoneForDisplay(_userData['phone'] ?? '');
       _roomNumberController.text = _userData['roomNumber'] ?? '';
       _contactNameController.text = _userData['contactName'] ?? '';
-      _contactPhoneController.text = _userData['contactPhone'] ?? '';
+      _contactPhoneController.text = _formatPhoneForDisplay(
+        _userData['contactPhone'] ?? '',
+      );
 
       // Exit edit mode
       if (section == 'personal') _isEditingPersonal = false;
@@ -340,6 +430,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 'Telefon',
                                 _phoneController,
                                 keyboardType: TextInputType.phone,
+                                inputFormatters: [_PhoneNumberFormatter()],
                               ),
                             ]
                           : [
@@ -357,7 +448,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               _buildDetailRow(
                                 context,
                                 'Telefon',
-                                _userData['phone'] ?? '',
+                                _formatPhoneForDisplay(
+                                  _userData['phone'] ?? '',
+                                ),
                               ),
                             ],
                       onEdit: () {
@@ -420,6 +513,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 'Telefon',
                                 _contactPhoneController,
                                 keyboardType: TextInputType.phone,
+                                inputFormatters: [_PhoneNumberFormatter()],
                               ),
                             ]
                           : [
@@ -431,7 +525,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               _buildDetailRow(
                                 context,
                                 'Telefon',
-                                _userData['contactPhone'] ?? 'Ikke angivet',
+                                _userData['contactPhone'] != null &&
+                                        _userData['contactPhone']!.isNotEmpty
+                                    ? _formatPhoneForDisplay(
+                                        _userData['contactPhone']!,
+                                      )
+                                    : 'Ikke angivet',
                               ),
                             ],
                       onEdit: () {

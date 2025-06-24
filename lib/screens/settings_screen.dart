@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:kollegieapp/widgets/theme_switch.dart';
+import 'package:kollegie_app/widgets/theme_switch.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../services/user_service.dart';
@@ -238,35 +238,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
-
-                const SizedBox(height: 40),
-
-                Center(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      _showLogoutDialog(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      minimumSize: const Size(
-                        double.infinity,
-                        50,
-                      ), // Gør knappen bredere
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text(
-                      'Log ud',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
               ],
             ),
           ),

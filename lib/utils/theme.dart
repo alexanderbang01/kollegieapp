@@ -79,7 +79,7 @@ class AppTheme {
     ),
   );
 
-  // Dark tema
+  // Dark tema - med blødere farver
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
@@ -87,11 +87,11 @@ class AppTheme {
       primary: primaryColor,
       secondary: secondaryColor,
       tertiary: accentColor,
-      background: const Color(0xFF000000), // iOS dark mode
-      surface: const Color(0xFF1C1C1E), // iOS dark mode card
+      background: const Color(0xFF121212), // Blødere dark mode baggrund
+      surface: const Color(0xFF1E1E1E), // Blødere surface farve
       onSurface: Colors.white.withOpacity(0.87),
     ),
-    scaffoldBackgroundColor: const Color(0xFF000000), // iOS dark background
+    scaffoldBackgroundColor: const Color(0xFF121212), // Blødere mørk baggrund
     // SF Pro-lignende font (Inter)
     textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
       displayLarge: GoogleFonts.inter(fontWeight: FontWeight.w500),
@@ -108,14 +108,14 @@ class AppTheme {
       bodySmall: GoogleFonts.inter(fontWeight: FontWeight.normal),
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1C1C1E),
+      backgroundColor: Color(0xFF1E1E1E), // Matchende app bar farve
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
     ),
     // Undgå at bruge CardTheme direkte
     // Brug i stedet cardColor-egenskab
-    cardColor: const Color(0xFF1C1C1E),
+    cardColor: const Color(0xFF1E1E1E), // Matchende card farve
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: primaryColor,
