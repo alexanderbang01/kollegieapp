@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../services/user_service.dart';
 import '../widgets/navigation_menu.dart';
+import '../widgets/success_notification.dart';
 import '../utils/constants.dart';
 import '../utils/theme.dart';
 
@@ -18,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<String, String?> _userData = {};
   bool _isLoading = true;
+  String? _userType;
 
   @override
   void initState() {
@@ -28,8 +30,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadUserData() async {
     try {
       final userData = await UserService.getUserData();
+      final userType = await UserService.getUserType();
       setState(() {
         _userData = userData;
+        _userType = userType;
         _isLoading = false;
       });
     } catch (e) {
@@ -66,12 +70,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ? AppTheme.primaryColor
             : Colors.white,
         elevation: 0,
-        // Flytter tilbage-knappen til venstre, men bruger iOS-stil
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
-        // Flytter navigationsmenuen til højre side
         actions: [
           IconButton(
             icon: const Icon(Icons.menu),
@@ -79,13 +81,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-      // Bruger den genbrugelige NavigationMenu-widget
       endDrawer: const NavigationMenu(currentRoute: settingsRoute),
       body: SafeArea(
         child: Padding(
           padding: AppSpacing.screenPadding,
           child: SingleChildScrollView(
-            // Sikrer at indholdet kan scrolles hvis det ikke passer
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -124,8 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ],
                         ),
-                        value:
-                            true, // Dette ville normalt være en gemt indstilling
+                        value: true,
                         onChanged: (value) {
                           // Implementer notifikationslogik her
                         },
@@ -238,12 +237,138 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
+
+                // SLET KONTO CARD - KUN FOR RESIDENTS (NEDERST)
+                if (_userType == 'resident') ...[
+                  const SizedBox(height: AppSpacing.large),
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: AppSpacing.cardPadding,
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.delete_forever,
+                          color: Colors.red,
+                        ),
+                        title: const Text(
+                          'Slet konto',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Slet din konto permanent fra systemet',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        onTap: () => _showDeleteAccountDialog(context),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Slet konto'),
+          content: const Text('Er du sikker på, at du vil slette din konto?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuller'),
+            ),
+            ElevatedButton(
+              onPressed: () => _deleteAccount(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Slet konto'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteAccount(BuildContext context) async {
+    Navigator.of(context).pop(); // Luk dialog
+
+    // Vis loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Sletter konto...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final success = await UserService.deleteAccount();
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Luk loading dialog
+      }
+
+      if (success) {
+        // Vis success notification
+        SuccessNotification.show(
+          context,
+          title: 'Konto slettet',
+          message: 'Din konto er blevet slettet permanent',
+          icon: Icons.check_circle,
+          color: Colors.green,
+          duration: const Duration(seconds: 2),
+        );
+
+        // Naviger med det samme til registrering (uden delay)
+        if (mounted) {
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/registration', (route) => false);
+        }
+      } else {
+        // Vis fejl notification
+        SuccessNotification.show(
+          context,
+          title: 'Fejl',
+          message: 'Der opstod en fejl ved sletning af kontoen',
+          icon: Icons.error,
+          color: Colors.red,
+          duration: const Duration(seconds: 4),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Luk loading dialog
+      }
+      SuccessNotification.show(
+        context,
+        title: 'Fejl',
+        message: 'Der opstod en fejl: $e',
+        icon: Icons.error,
+        color: Colors.red,
+        duration: const Duration(seconds: 4),
+      );
+    }
   }
 
   Widget _buildInfoRow(BuildContext context, String label, String value) {
@@ -259,14 +384,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
           ),
           Flexible(
-            // Flexible sikrer at værdien ikke overskrider skærmens bredde
             child: Text(
               value.isEmpty ? 'Ikke angivet' : value,
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-              overflow:
-                  TextOverflow.ellipsis, // Viser "..." hvis teksten er for lang
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'api_service.dart';
 
 class UserService {
   // Check om brugeren er registreret
@@ -57,6 +58,39 @@ class UserService {
 
   // Log ud bruger (ryd registrering)
   static Future<void> logoutUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
+
+  // Slet brugerens konto (kun for residents)
+  static Future<bool> deleteAccount() async {
+    try {
+      final userId = await getUserId();
+      final userType = await getUserType();
+
+      // Kun residents kan slette deres konto
+      if (userType != 'resident') {
+        return false;
+      }
+
+      final response = await ApiService.delete(
+        endpoint: '/residents/delete_account.php',
+        authorization: 'Bearer $userId:$userType',
+      );
+
+      if (response['success'] == true) {
+        // Ryd lokal data efter succesfuld sletning
+        await clearUserData();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Ryd alle lokale brugerdata
+  static Future<void> clearUserData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }
