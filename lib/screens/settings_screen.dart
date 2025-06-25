@@ -304,7 +304,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _deleteAccount(BuildContext context) async {
-    Navigator.of(context).pop(); // Luk dialog
+    // Gem navigation context før async operationer
+    final navigator = Navigator.of(context);
+
+    navigator.pop(); // Luk dialog
 
     // Vis loading
     showDialog(
@@ -324,9 +327,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final success = await UserService.deleteAccount();
 
-      if (mounted) {
-        Navigator.of(context).pop(); // Luk loading dialog
-      }
+      // Tjek mounted før dialog operationer
+      if (!mounted) return;
+
+      Navigator.of(context).pop(); // Luk loading dialog
 
       if (success) {
         // Vis success notification
@@ -339,35 +343,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
           duration: const Duration(seconds: 2),
         );
 
-        // Naviger med det samme til registrering (uden delay)
-        if (mounted) {
-          Navigator.of(
-            context,
-          ).pushNamedAndRemoveUntil('/registration', (route) => false);
-        }
+        // Naviger med det samme til registrering
+        navigator.pushNamedAndRemoveUntil('/registration', (route) => false);
       } else {
         // Vis fejl notification
+        if (mounted) {
+          SuccessNotification.show(
+            context,
+            title: 'Fejl',
+            message: 'Der opstod en fejl ved sletning af kontoen',
+            icon: Icons.error,
+            color: Colors.red,
+            duration: const Duration(seconds: 4),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Luk loading dialog
         SuccessNotification.show(
           context,
           title: 'Fejl',
-          message: 'Der opstod en fejl ved sletning af kontoen',
+          message: 'Der opstod en fejl: $e',
           icon: Icons.error,
           color: Colors.red,
           duration: const Duration(seconds: 4),
         );
       }
-    } catch (e) {
-      if (mounted) {
-        Navigator.of(context).pop(); // Luk loading dialog
-      }
-      SuccessNotification.show(
-        context,
-        title: 'Fejl',
-        message: 'Der opstod en fejl: $e',
-        icon: Icons.error,
-        color: Colors.red,
-        duration: const Duration(seconds: 4),
-      );
     }
   }
 
