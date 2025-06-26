@@ -1,4 +1,4 @@
-package com.example.kollegieapp
+package com.mercantec.mercanteckollegieapp
 
 import io.flutter.embedding.android.FlutterActivity
 

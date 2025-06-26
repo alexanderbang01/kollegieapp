@@ -448,14 +448,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             decoration: const InputDecoration(
               labelText: 'Værelsenummer',
               prefixIcon: Icon(Icons.door_front_door),
-              hintText: '204',
+              hintText: '101',
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Indtast dit værelsenummer';
               }
-              if (!RegExp(r'^\d{3}$').hasMatch(value.trim())) {
-                return 'Værelsenummer skal være 3 cifre (f.eks. 204)';
+              // Tilad alle numre fra 0-999
+              final intValue = int.tryParse(value.trim());
+              if (intValue == null || intValue < 0 || intValue > 999) {
+                return 'Værelsenummer skal være mellem 0 og 999';
               }
               return null;
             },
